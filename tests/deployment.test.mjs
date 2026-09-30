@@ -106,3 +106,10 @@ test('retained Sites Worker still serves assets and uses the shared API', async 
   assert.equal((await worker.fetch(new Request('https://site.example/api/audience'))).status, 405);
   assert.equal((await worker.fetch(new Request('https://site.example/social.mjs'))).status, 404);
 });
+
+test('portrait analysis is deployed locally and its model remains pinned',async()=>{
+ const {createHash}=await import('node:crypto');
+ const bytes=await readFile('dist/public/assets/vision/v1/selfie-multiclass.tflite');
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),'c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0');
+ for(const name of ['vision_wasm_internal.js','vision_wasm_internal.wasm','vision_wasm_nosimd_internal.js','vision_wasm_nosimd_internal.wasm'])assert.ok((await readFile('dist/public/assets/vision/v1/wasm/'+name)).length>100_000);
+});

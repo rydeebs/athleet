@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 const [sourceArg,blender]=process.argv.slice(2);if(!sourceArg||!blender)throw new Error('Provide a temporary source directory and Blender executable path.');
-const source=resolve(sourceArg),output=resolve('assets/athletes/v1');await mkdir(source,{recursive:true});await mkdir(output,{recursive:true});
+const source=resolve(sourceArg),output=resolve('assets/athletes/v2');await mkdir(source,{recursive:true});await mkdir(output,{recursive:true});
 const revision='afb9f530a7c2741dedb8df0ebae2e0b183caec21',raw=`https://raw.githubusercontent.com/makehumancommunity/mpfb2/${revision}/src/mpfb/data/`;
 const sources=[];
 async function download(url,file){const path=source+'/'+file;try{await access(path);}catch{const r=await fetch(url);if(!r.ok)throw new Error(`${r.status}: ${url}`);await writeFile(path,Buffer.from(await r.arrayBuffer()));}sources.push({url,file,sha256:createHash('sha256').update(await readFile(path)).digest('hex')});}
@@ -20,4 +20,5 @@ await sharp(source+'/system/eyes/materials/brown_eye.png').resize(512,512).jpeg(
 await sharp(source+'/system/clothes/shoes04/shoes04_diffuse.png').resize(1024,1024).jpeg({quality:85}).toFile(output+'/shoes.jpg');
 execFileSync(blender,['-b','--python','scripts/build-athletes.py','--',source,output],{stdio:'inherit'});
 for(const file of await readdir(output))if(file.endsWith('.png')){await sharp(output+'/'+file).webp({quality:85}).toFile(output+'/'+file.replace('.png','.webp'));await unlink(output+'/'+file);}
+execFileSync(process.execPath,['scripts/compress-athletes.mjs'],{stdio:'inherit'});
 await writeFile('assets/athletes/sources.json',JSON.stringify({revision,sources},null,2)+'\n');

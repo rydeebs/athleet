@@ -1,5 +1,5 @@
 import {normalizeAvatar,escapeHtml as e,outfits} from './model.mjs';
-export const avatarAssetRoot='/assets/athletes/v1/';
+export const avatarAssetRoot='/assets/athletes/v2/';
 export function avatarPoster(avatar={},outfit='singlet'){
  const a=normalizeAvatar(avatar);return `${avatarAssetRoot}${a.presentation}-${Object.hasOwn(outfits,outfit)?outfit:'singlet'}.webp`;
 }
@@ -7,8 +7,8 @@ export function avatarPoster(avatar={},outfit='singlet'){
 export function avatarSvg(avatar={},outfit='singlet'){
  return `<img class="athlete-poster" src="${avatarPoster(avatar,outfit)}" alt="Generic race outfit preview" loading="lazy" decoding="async" width="600" height="800"><span class="poster-label">Generic avatar</span>`;
 }
-export function avatarStudio({avatar,outfit='singlet',view='front',viewKey=0,selected=[],reserved=[],interactive=true,available=null,brand='',logo='',active='',face='',faceVersion=0,closeup=false}){
- const config={avatar:normalizeAvatar(avatar),outfit:Object.hasOwn(outfits,outfit)?outfit:'singlet',view,viewKey,selected,reserved,interactive,available,brand,logo,active,face,faceVersion,closeup};
+export function avatarStudio({avatar,outfit='singlet',view='front',viewKey=0,selected=[],reserved=[],interactive=true,available=null,brand='',logo='',active='',face='',faceVersion=0,faceDetails=null,closeup=false}){
+ const config={avatar:normalizeAvatar(avatar),outfit:Object.hasOwn(outfits,outfit)?outfit:'singlet',view,viewKey,selected,reserved,interactive,available,brand,logo,active,face,faceVersion,faceDetails,closeup};
  return `<div class="body-stage model-stage" data-avatar="${e(JSON.stringify(config))}"><div class="stage-grid"></div><div class="stage-orbit"></div><span class="stage-coordinate">3D / PLACEMENT STUDIO</span><div class="model-viewport" role="group" aria-label="Interactive generic athlete model. Drag to turn. Use arrow keys to rotate, plus or minus to zoom.">${avatarSvg(config.avatar,config.outfit)}</div><div class="model-status" role="status">Loading 3D preview…</div><span class="stage-caption">${face?'PHOTO FACE PREVIEW · APPROXIMATE LIKENESS':'DRAG TO ROTATE · SCROLL OR PINCH TO ZOOM'}</span></div>`;
 }
 // The existing forms replace preview markup as they change. Reuse one renderer across

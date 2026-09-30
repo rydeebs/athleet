@@ -5,9 +5,9 @@ let loadedAt=0,worker;
 createServer(async(req,res)=>{
  try{
   const assetPath=new URL(req.url,'http://localhost').pathname;
-  if(assetPath.startsWith('/assets/athletes/')&&/^\/assets\/athletes\/(?:v1\/)?[a-zA-Z0-9_.-]+$/.test(assetPath)){
+  if(assetPath.startsWith('/assets/')&&/^\/assets\/(?:athletes\/(?:v[12]\/)?|vision\/v1\/(?:wasm\/)?)[a-zA-Z0-9_.-]+$/.test(assetPath)){
    if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return;}
-   try{const body=await readFile(new URL('./dist/public'+assetPath,import.meta.url));const ext=assetPath.split('.').pop();res.writeHead(200,{'Content-Type':({glb:'model/gltf-binary',jpg:'image/jpeg',png:'image/png',webp:'image/webp',json:'application/json',md:'text/plain'})[ext]||'application/octet-stream','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body);}catch{res.writeHead(404);res.end();}return;
+   try{const body=await readFile(new URL('./dist/public'+assetPath,import.meta.url));const ext=assetPath.split('.').pop();res.writeHead(200,{'Content-Type':({wasm:'application/wasm',js:'text/javascript',tflite:'application/octet-stream',glb:'model/gltf-binary',jpg:'image/jpeg',png:'image/png',webp:'image/webp',json:'application/json',md:'text/plain'})[ext]||'application/octet-stream','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:body);}catch{res.writeHead(404);res.end();}return;
   }
 
   const {mtimeMs}=await stat(new URL('./dist/server/index.js',import.meta.url));

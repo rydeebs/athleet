@@ -21,7 +21,7 @@ test('portrait upload rejects unsupported, empty and oversized files',()=>{
  assert.throws(()=>validatePortrait({type:'image/heic',size:100}),/HEIC/);
  assert.throws(()=>validatePortrait({type:'image/jpeg',size:9*1024*1024}),/8 MB/);
  assert.throws(()=>validatePortrait({type:'image/jpeg',size:0}),/empty/);
- assert.deepEqual(facePreview(),{url:'',version:0});
+ assert.deepEqual(facePreview(),{url:'',version:0,details:null});
 });
 test('portrait fit preserves aspect ratio and clamps extreme alignment input',()=>{
  assert.deepEqual(portraitTransform(1024,1280),{scale:.5,x:256,y:320,rotation:0});

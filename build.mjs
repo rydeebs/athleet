@@ -8,6 +8,8 @@ const assets={};
 for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};}
 assets['/portal.js']={body:await readFile('dist/public/portal.js','utf8'),type:'text/javascript; charset=utf-8'};
 for(const file of await readdir('dist/public/chunks'))assets['/chunks/'+file]={body:await readFile('dist/public/chunks/'+file,'utf8'),type:'text/javascript; charset=utf-8'};
+await cp('assets/vision','dist/public/assets/vision',{recursive:true});
+await cp('node_modules/@mediapipe/tasks-vision/wasm','dist/public/assets/vision/v1/wasm',{recursive:true});
 await cp('assets/athletes','dist/public/assets/athletes',{recursive:true});
 await writeFile('dist/server/assets.mjs','export const assets='+JSON.stringify(assets)+';\n');
 const portalConfigSource=await readFile('server/portal-config.mjs','utf8');

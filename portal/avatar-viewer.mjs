@@ -1,11 +1,13 @@
 import * as THREE from 'three';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
 import {avatarAssetRoot} from './avatar.mjs';
+import {medianColor} from './photo-color.mjs';
 import {skins} from './model.mjs';
 const modelCache=new Map(),textureCache=new Map();
-const loader=new GLTFLoader(),textures=new THREE.TextureLoader();
+const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder),textures=new THREE.TextureLoader();
 function model(name){if(!modelCache.has(name))modelCache.set(name,loader.loadAsync(avatarAssetRoot+name+'.glb').catch(e=>{modelCache.delete(name);throw e;}));return modelCache.get(name);}
 function texture(name){if(!textureCache.has(name))textureCache.set(name,textures.loadAsync(avatarAssetRoot+name).then(t=>{t.colorSpace=THREE.SRGBColorSpace;t.flipY=false;t.anisotropy=4;return t;}).catch(e=>{textureCache.delete(name);throw e;}));return textureCache.get(name);}
 import {garments,anchors} from './avatar-layout.mjs';
@@ -29,23 +31,35 @@ export class AvatarViewer{
   if(!old||old.view!==config.view||old.viewKey!==config.viewKey||old.closeup!==config.closeup)this.reset();this.resize();
   try{
    const a=config.avatar,sex=a.presentation==='feminine'?'female':'male',tone=skins.indexOf(a.skin),hair=a.presentation==='feminine'?'ponytail01':'short02';
-   const [asset,skin,hairMap,eyeMap,shoeMap]=await Promise.all([model(a.presentation),texture(`skin-${sex}-${tone>=3?'dark':'light'}.jpg`),texture('hair-'+hair+'.webp'),texture('eyes.jpg'),texture('shoes.jpg')]);
+   const [asset,skin,hairMap,eyeMap,shoeMap]=await Promise.all([model(a.presentation),texture(`skin-${sex}-${!config.face&&tone>=3?'dark':'light'}.jpg`),texture('hair-'+hair+'.webp'),texture('eyes.jpg'),texture('shoes.jpg')]);
    if(version!==this.version||this.disposed)return;
    if(this.presentation!==a.presentation){this.clearModel();this.body=asset.scene.clone(true);this.body.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.frustumCulled=false;}});this.scene.add(this.body);this.presentation=a.presentation;}
    const visible=new Set(['Body','Hair','Eyes','Shoes',...garments[config.outfit]]);
+   if(config.face)visible.delete('Hair');
    this.surfaces=[];this.body.traverse(o=>{if(!o.isMesh)return;const name=o.name.split('_')[0].split('.')[0];o.visible=visible.has(name);const m=o.material;
     if(o.morphTargetInfluences){for(const [key,index] of Object.entries(o.morphTargetDictionary))o.morphTargetInfluences[index]=key===a.build?1:0;}
-    m.roughness=.74;m.metalness=0;
+    m.roughness=.58;m.metalness=0;
     if(name==='Body'){m.map=skin;m.color.set(['#fff5ed','#e5c6a9','#cda581','#fff0dd','#d1b59a','#9a7c64'][tone]||'#ffffff');}
     else if(name==='Hair'){m.map=hairMap;m.color.set('#47372a');m.alphaTest=.35;m.transparent=false;m.side=THREE.DoubleSide;m.depthWrite=true;}
-    else if(name==='Eyes'){m.map=eyeMap;m.color.set('#ffffff');m.roughness=.22;}
+    else if(name==='Eyes'){m.map=config.face?null:eyeMap;m.color.set(config.faceDetails?.skin||'#ffffff');m.roughness=config.face?.58:.22;}
     else if(name==='Shoes'){m.map=shoeMap;m.color.set('#d9ddd3');}
-    else{m.map=null;m.color.set(a.kit);m.side=THREE.DoubleSide;m.roughness=.9;}
+    else{m.map=null;m.color.set(a.kit);if(['Shorts','Leggings'].includes(name))m.color.multiplyScalar(.82);m.side=THREE.DoubleSide;m.roughness=.9;}
     m.needsUpdate=true;if(o.visible&&!['Hair','Eyes','Shoes'].includes(name))this.surfaces.push(o);
    });
-   this.body.updateMatrixWorld(true);this.findAnchors();await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
+   this.body.updateMatrixWorld(true);if(config.faceDetails?.skin)this.matchSkin(skin,config.faceDetails.skin);this.findAnchors();await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
    stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.draw();
   }catch(error){if(version===this.version)this.fail('3D unavailable. Outfit preview shown; use the placement list below.');throw error;}
+ }
+ matchSkin(base,color){
+  const key=base.uuid+color,body=this.body.getObjectByName('Body');if(!body)return;
+  if(this.skinKey!==key){
+   this.matchedSkin?.dispose();const canvas=document.createElement('canvas');canvas.width=base.image.width;canvas.height=base.image.height;const ctx=canvas.getContext('2d');ctx.drawImage(base.image,0,0);const pixels=ctx.getImageData(0,0,canvas.width,canvas.height),samples=[];
+   for(const x of [-.045,.045]){this.ray.set(new THREE.Vector3(x,1.605,1),new THREE.Vector3(0,0,-1));const hit=this.ray.intersectObject(body,false)[0];if(!hit?.uv)continue;const cx=Math.round(hit.uv.x*(canvas.width-1)),cy=Math.round(hit.uv.y*(canvas.height-1));for(let y=-3;y<=3;y++)for(let dx=-3;dx<=3;dx++){const i=((cy+y)*canvas.width+cx+dx)*4;if(i>=0&&i+2<pixels.data.length)samples.push(Array.from(pixels.data.slice(i,i+3)));}}
+   const reference=medianColor(samples)||[220,173,145],target=color.slice(1).match(/../g).map(x=>parseInt(x,16));
+   for(let i=0;i<pixels.data.length;i+=4)for(let c=0;c<3;c++)pixels.data[i+c]=Math.min(255,pixels.data[i+c]*target[c]/Math.max(1,reference[c]));
+   ctx.putImageData(pixels,0,0);this.matchedSkin=new THREE.CanvasTexture(canvas);this.matchedSkin.flipY=false;this.matchedSkin.colorSpace=THREE.SRGBColorSpace;this.matchedSkin.anisotropy=4;this.skinKey=key;
+  }
+  body.material.map=this.matchedSkin;body.material.color.set('#ffffff');body.material.needsUpdate=true;
  }
  findAnchors(){
   this.points={};for(const [zone,[x,y,side]] of Object.entries(anchors)){
@@ -72,24 +86,30 @@ export class AvatarViewer{
  async updateFace(version){
   const c=this.config,signature=[c.face,c.faceVersion,c.avatar.presentation,c.avatar.build].join('|');
   if(this.faceSignature===signature)return;this.clearFace();if(!c.face){this.faceSignature=signature;return;}
-  const map=await new THREE.TextureLoader().loadAsync(c.face);map.colorSpace=THREE.SRGBColorSpace;
-  if(version!==this.version||this.disposed){map.dispose();return;}
-  this.faceSignature=signature;this.faceMap=map;this.faceMeshes=[];
+  const [map,hairMap]=await Promise.all([textures.loadAsync(c.face),c.faceDetails?.hair?textures.loadAsync(c.faceDetails.hair):null]);map.colorSpace=THREE.SRGBColorSpace;if(hairMap)hairMap.colorSpace=THREE.SRGBColorSpace;
+  if(version!==this.version||this.disposed){map.dispose();hairMap?.dispose();return;}
+  this.faceHairMap=hairMap;this.faceSignature=signature;this.faceMap=map;this.faceMeshes=[];
   // Project the aligned portrait onto the existing face and eye surfaces. This
-  // personalizes texture only: head geometry, profile and hair remain generic.
+  // personalizes texture only; head geometry and profile remain generic.
   for(const name of ['Body','Eyes']){
    const mesh=this.body.getObjectByName(name);if(!mesh)continue;
    const geometry=mesh.geometry.clone(),p=geometry.attributes.position,v=new THREE.Vector3();
    for(let i=0;i<p.count;i++){mesh.getVertexPosition(i,v);p.setXYZ(i,v.x,v.y,v.z);}geometry.morphAttributes={};geometry.computeVertexNormals();
    const surface=new THREE.Mesh(geometry);surface.matrixWorld.copy(mesh.matrixWorld);
    const decal=new DecalGeometry(surface,new THREE.Vector3(0,1.622,.14),new THREE.Euler(),new THREE.Vector3(.18,.225,.19));geometry.dispose();
-   const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-6,toneMapped:false});
+   const material=new THREE.MeshStandardMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-6,roughness:.58});
    const face=new THREE.Mesh(decal,material);face.renderOrder=4;this.faceMeshes.push(face);this.scene.add(face);
   }
+  if(hairMap){
+   const height=.225/640*c.faceDetails.hairHeight,top=1.622+.225/2+256*.225/640;
+   const geometry=new THREE.PlaneGeometry(.36,height,32,48),p=geometry.attributes.position;
+   for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i)+top-height/2;const z=y>1.49?.16-.01*(x/.18)**2:.17-.04*(x/.22)**2;p.setXYZ(i,x,y,z);}geometry.computeVertexNormals();
+   const hair=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({map:hairMap,transparent:true,alphaTest:.02,depthWrite:false,roughness:.8,side:THREE.FrontSide}));hair.renderOrder=6;this.faceMeshes.push(hair);this.scene.add(hair);
+  }
  }
- clearFace(){for(const face of this.faceMeshes||[]){this.scene.remove(face);face.geometry.dispose();face.material.dispose();}this.faceMap?.dispose();this.faceMap=null;this.faceMeshes=[];this.faceSignature='';}
+ clearFace(){for(const face of this.faceMeshes||[]){this.scene.remove(face);face.geometry.dispose();face.material.dispose();}this.faceMap?.dispose();this.faceHairMap?.dispose();this.faceHairMap=null;this.faceMap=null;this.faceMeshes=[];this.faceSignature='';}
  clearLogo(){if(this.decal){this.scene.remove(this.decal);this.decal.geometry.dispose();this.decal.material.map?.dispose();this.decal.material.dispose();this.decal=null;}}
- clearModel(){this.clearLogo();this.clearFace();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
+ clearModel(){this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
  reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
  control(action){if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
  resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.draw();}

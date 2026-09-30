@@ -28,7 +28,7 @@
       ]
     },
     {
-      "source": "/(assets/athletes/v1|chunks)/(.*)",
+      "source": "/(assets/athletes/v1|assets/athletes/v2|assets/vision/v1|chunks)/(.*)",
       "headers": [
         {
           "key": "Cache-Control",

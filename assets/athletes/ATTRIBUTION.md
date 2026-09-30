@@ -1,4 +1,4 @@
-# Athleet generic avatar library — version 1
+# Athleet generic avatar library — versions 1 and 2
 
 The body mesh, morph targets, skin textures, eyes, hair and shoes derive from the MakeHuman community's explicitly **CC0** core assets. No athlete was scanned and no person's likeness is claimed. These are adult generic placement templates, not measurements or digital twins.
 

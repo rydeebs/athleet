@@ -33,16 +33,34 @@ def shape(pres,build='athletic'):
   avg=delta('universal-'+sex+'-young-averagemuscle-averageweight')
   strong=delta('universal-'+sex+'-young-maxmuscle-averageweight')
   lean=delta('universal-'+sex+'-young-maxmuscle-minweight')
-  a+=(lean if build=='lean' else strong if build=='strong' else avg*.4+strong*.6)*w
+  a+=(lean*.85+strong*.15 if build=='lean' else strong if build=='strong' else lean*.35+strong*.65)*w
  return a
 
 def transform(points,lowest):
  p=points.copy();p[:,1]-=lowest
- return np.stack([p[:,0],-p[:,2],p[:,1]],axis=1)*SCALE
+ p=np.stack([p[:,0],-p[:,2],p[:,1]],axis=1)*SCALE
+ # Broad, anatomical volume changes keep the three trained builds legible.
+ x=p[:,0].copy();h=p[:,2];front=np.clip((-p[:,1]-.015)/.06,0,1)
+ breadth={'lean':.96,'athletic':1.045,'strong':1.15}[BUILD]
+ p[:,0]*=1+(breadth-1)*np.exp(-((h-1.25)/.30)**4)
+ p[:,0]*=1-{'lean':.06,'athletic':.05,'strong':.025}[BUILD]*np.exp(-((h-1.035)/.11)**2)
+ def g(cx,cz,sx,sz):return np.exp(-((np.abs(x)-cx)/sx)**2-((h-cz)/sz)**2)
+ pec={'lean':.008,'athletic':.014,'strong':.021}[BUILD]*(.45 if PRES=='feminine' else 1)
+ definition={'lean':.0035,'athletic':.0045,'strong':.0055}[BUILD]
+ relief=pec*g(.075,1.335,.066,.065)
+ for z in [1.075,1.14,1.205]:relief+=definition*g(.037,z,.028,.025)
+ relief-=.0015*g(0,1.15,.008,.14)
+ p[:,1]-=relief*front
+ return p
 
 def material(name,color=(1,1,1,1),texture=None,alpha=False):
  m=bpy.data.materials.new(name);m.diffuse_color=color;m.use_nodes=True
- bs=m.node_tree.nodes.get('Principled BSDF');bs.inputs['Base Color'].default_value=color;bs.inputs['Roughness'].default_value=.68
+ bs=m.node_tree.nodes.get('Principled BSDF');bs.inputs['Base Color'].default_value=color;bs.inputs['Roughness'].default_value=.56 if name=='Skin' else .82
+ if name=='Skin':bs.inputs['Subsurface Weight'].default_value=.08
+ if name in ['Skin','Kit']:
+  noise=m.node_tree.nodes.new('ShaderNodeTexNoise');noise.inputs['Scale'].default_value=650 if name=='Skin' else 400
+  bump=m.node_tree.nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.13;bump.inputs['Distance'].default_value=.001
+  m.node_tree.links.new(noise.outputs['Fac'],bump.inputs['Height']);m.node_tree.links.new(bump.outputs['Normal'],bs.inputs['Normal'])
  if texture:
   t=m.node_tree.nodes.new('ShaderNodeTexImage');t.image=bpy.data.images.load(OUT+'/'+texture,check_existing=True)
   mix=m.node_tree.nodes.new('ShaderNodeMixRGB');mix.blend_type='MULTIPLY';mix.inputs[0].default_value=1
@@ -79,7 +97,7 @@ def mesh(name,positions,uvs,fs,mat,offset=0):
     elif name=='Leggings' and v.co.z<.2:v.co.z=.12
   for v in m.vertices:
    p,n,_,distance=BODY_BVH.find_nearest(v.co)
-   if p is not None:v.co=p+n*.012
+   if p is not None:v.co=p+n*.004
   m.update()
  return ob,used
 
@@ -99,8 +117,37 @@ def proxy(path,points):
    else:mapping.append(sum(points[int(p[i])]*float(p[3+i]) for i in range(3))+np.array(list(map(float,p[6:9])))*scales)
  return np.array(mapping),u,fs
 
+def refine_surface(ob,levels,body=False):
+ original=ob.data
+ keys=[(k.name,[v.co.copy() for v in k.data]) for k in original.shape_keys.key_blocks] if original.shape_keys else [('Basis',[v.co.copy() for v in original.vertices])]
+ meshes=[]
+ for name,coords in keys:
+  m=bpy.data.meshes.new('refine');m.from_pydata(coords,[],[list(p.vertices) for p in original.polygons]);m.update()
+  layer=m.uv_layers.new(name='UVMap')
+  for i,d in enumerate(original.uv_layers.active.data):layer.data[i].uv=d.uv
+  tmp=bpy.data.objects.new('refine',m);bpy.context.collection.objects.link(tmp)
+  bpy.context.view_layer.objects.active=tmp
+  mod=tmp.modifiers.new('Smooth surface','SUBSURF');mod.levels=levels
+  bpy.ops.object.modifier_apply(modifier=mod.name)
+  refined=tmp.data.copy()
+  if not body:
+   target=BODY_OBJECT.data.shape_keys.key_blocks.get(name) or BODY_OBJECT.data.shape_keys.key_blocks[0]
+   bvh=BVHTree.FromPolygons([v.co for v in target.data],[list(p.vertices) for p in BODY_OBJECT.data.polygons])
+   for v in refined.vertices:
+    loc,n,_,_=bvh.find_nearest(v.co)
+    if loc is not None:v.co=loc+n*.0035
+  meshes.append((name,refined));bpy.data.objects.remove(tmp,do_unlink=True)
+ ob.shape_key_clear();ob.data=meshes[0][1]
+ for mat in original.materials:ob.data.materials.append(mat)
+ for poly in ob.data.polygons:poly.use_smooth=True
+ if len(meshes)>1:
+  for name,m in meshes:
+   key=ob.shape_key_add(name=name)
+   for i,v in enumerate(m.vertices):key.data[i].co=v.co
+ return ob
+
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True
+scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=64;scene.cycles.use_denoising=True
 scene.render.resolution_x=600;scene.render.resolution_y=800;scene.render.resolution_percentage=100
 scene.render.image_settings.file_format='PNG';scene.render.film_transparent=True
 scene.world.color=(.35,.35,.35);scene.view_settings.view_transform='AgX'
@@ -109,7 +156,7 @@ for name,loc,power,size in [('Key',(-3,-4,4),450,4),('Fill',(3,-2,2.5),230,3),('
 bpy.ops.object.camera_add(location=(2.1,-5.8,1.9));camera=bpy.context.object;camera.rotation_euler=(Vector((0,0,.89))-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=2.02;scene.camera=camera
 outfits=['shirtless','singlet','sports-bra','tee','long-sleeve','tri-suit','wetsuit']
 for pres in ['masculine','feminine','neutral']:
- points=shape(pres);low=min(points[i,1] for g,f in faces if g=='body' for i,t in f);high=max(points[i,1] for g,f in faces if g=='body' for i,t in f);SCALE=1.75/(high-low);pos=transform(points,low)
+ PRES=pres;BUILD='athletic';points=shape(pres);low=min(points[i,1] for g,f in faces if g=='body' for i,t in f);high=max(points[i,1] for g,f in faces if g=='body' for i,t in f);SCALE=1.75/(high-low);pos=transform(points,low)
  sex='female' if pres=='feminine' else 'male'
  mats={'skin':material('Skin',texture='skin-'+sex+'-light.jpg'),'kit':material('Kit',(.035,.065,.048,1)),'hair':material('Hair',texture='hair-'+('ponytail01' if pres=='feminine' else 'short02')+'.png',alpha=True),'eyes':material('Eyes',texture='eyes.jpg'),'shoes':material('Shoes',texture='shoes.jpg')}
  objects=[]
@@ -117,7 +164,7 @@ for pres in ['masculine','feminine','neutral']:
  BODY_BVH=BVHTree.FromPolygons([v.co for v in body.data.vertices],[list(p.vertices) for p in body.data.polygons])
  body.shape_key_add(name='Basis')
  for build in ['lean','strong']:
-  new=transform(shape(pres,build),low);key=body.shape_key_add(name=build)
+  BUILD=build;new=transform(shape(pres,build),low);BUILD='athletic';key=body.shape_key_add(name=build)
   for j,i in enumerate(used):key.data[j].co=new[i]
  # Tight helper follows body contours; crop into garments with distinct coverage.
  helper=[f for f in faces if f[0]=='helper-tights']
@@ -132,7 +179,7 @@ for pres in ['masculine','feminine','neutral']:
     # Neckline and armholes follow the fitted torso; sleeves extend over the arms.
     if kind in ['Singlet','Bra']:keep=keep and ax<(.17 if z>1.30 else .20) and not(z>1.38 and ax<.085)
     if kind=='Bra':keep=keep and z>1.21
-    if kind=='Tee':keep=keep and (ax<.24 or z>1.16)
+    if kind=='Tee':keep=keep and (ax<.19 or (ax-.18)*.72+(1.43-z)*.69<.18)
     if kind=='LongSleeve':keep=(.99<z<1.47 and ax<.32) or (ax>=.20 and .76<z<1.46)
    if keep:result.append((g,f))
   return result
@@ -140,10 +187,13 @@ for pres in ['masculine','feminine','neutral']:
   ob,indices=mesh(kind,pos,uv,choose(kind),mats['kit'],.006);objects.append(ob)
   ob.shape_key_add(name='Basis')
   for build in ['lean','strong']:
-   new=transform(shape(pres,build),low);key=ob.shape_key_add(name=build)
+   BUILD=build;new=transform(shape(pres,build),low);BUILD='athletic';key=ob.shape_key_add(name=build)
    for j,i in enumerate(indices):key.data[j].co=ob.data.vertices[j].co+Vector(new[i]-pos[i])
  for name,path,mat in [('Hair','hair/'+('ponytail01/ponytail01' if pres=='feminine' else 'short02/short02'),'hair'),('Eyes','eyes/low-poly/low-poly','eyes'),('Shoes','clothes/shoes04/shoes04','shoes')]:
   p,u,fs=proxy(path,points);ob,_=mesh(name,transform(p,low),u,fs,mats[mat]);objects.append(ob)
+ BODY_OBJECT=body
+ for o in objects:
+  if o.name in ['Body','Shorts','Leggings','Singlet','Bra','Tee','LongSleeve']:refine_surface(o,1 if o.name=='Body' else 2,body=o.name=='Body')
  bpy.ops.object.select_all(action='DESELECT')
  for o in objects:o.select_set(True)
  # Store geometry and named material slots only; shared texture assets load once on the web.
