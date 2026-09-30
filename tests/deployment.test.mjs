@@ -113,3 +113,5 @@ test('portrait analysis is deployed locally and its model remains pinned',async(
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0');
  for(const name of ['vision_wasm_internal.js','vision_wasm_internal.wasm','vision_wasm_nosimd_internal.js','vision_wasm_nosimd_internal.wasm'])assert.ok((await readFile('dist/public/assets/vision/v1/wasm/'+name)).length>100_000);
 });
+
+test('five-view alignment model is deployed locally at its pinned version',async()=>{const {createHash}=await import('node:crypto');const b=await readFile('dist/public/assets/vision/v1/face-landmarker.task');assert.equal(createHash('sha256').update(b).digest('hex'),'64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff');});

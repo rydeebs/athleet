@@ -10,6 +10,7 @@ export function portraitTransform(width,height,{zoom=1,x=0,y=0,rotation=0}={}){
  const clamp=(n,a,b)=>Math.min(b,Math.max(a,Number(n)||0));
  const scale=Math.max(512/width,640/height)*clamp(zoom,1,8);return {scale,x:256+clamp(x,-100,100)/100*width*scale/2,y:320+clamp(y,-100,100)/100*height*scale/2,rotation:clamp(rotation,-25,25)*Math.PI/180};
 }
+let extraUrls=[];
 let source=null,sourceUrl='',faceUrl='',hairUrl='',details=null,revision=0,pending=0;
 export const facePreview=()=>({url:faceUrl,version:revision,details});
 export function portraitAvailable(){return !!source;}
@@ -58,10 +59,12 @@ export async function applyPortrait(settings){
   extContext.putImageData(pixels,0,0);nextHair=await new Promise(resolve=>extended.toBlob(resolve,'image/png'));
  }
  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error('Could not prepare the photo. Try again.');if(request!==pending)return false;
- if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);
+ extraUrls.forEach(u=>URL.revokeObjectURL(u));extraUrls=[];if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);
  faceUrl=URL.createObjectURL(blob);hairUrl=nextHair?URL.createObjectURL(nextHair):'';
  details={skin:colorHex(rgb),exposure:Number(settings.skinExposure)||0,hairBounds,hairColor,hair:hairUrl,hairLength:settings.hairLength||'short',hairHeight:extended.height,includeHair:!!settings.includeHair};revision++;return true;
 }
-export function clearPortrait(){pending++;if(sourceUrl)URL.revokeObjectURL(sourceUrl);if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);source=null;sourceUrl='';faceUrl='';hairUrl='';details=null;revision++;}
+export function clearPortrait(){pending++;extraUrls.forEach(u=>URL.revokeObjectURL(u));extraUrls=[];if(typeof window!=='undefined')window.dispatchEvent(new Event('athleet:clear-portrait'));if(sourceUrl)URL.revokeObjectURL(sourceUrl);if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);source=null;sourceUrl='';faceUrl='';hairUrl='';details=null;revision++;}
 
 export function cancelPortraitProcessing(){pending++;}
+
+export function installLikeness(url,nextDetails,urls){pending++;if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);extraUrls.forEach(u=>URL.revokeObjectURL(u));extraUrls=urls.filter(u=>u!==url);faceUrl=url;hairUrl='';details=nextDetails;revision++;}

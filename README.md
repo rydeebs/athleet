@@ -47,3 +47,5 @@ Avatar choices include Male/Female, build, skin tone, kit color, and preview clo
 Avatar choices are optional visual preferences and do not affect pricing. No body image, ethnicity, exact age, height, or weight is required. Social handles are transmitted only when the user requests a lookup.
 
 Photography: Unsplash, Leona Lee (xGzdmd5lB6I), Miguel Alcântara (nFz4XuVpPD8), Ryan Snaadt (BoCR26LwEcw). No endorsement implied.
+
+An optional **Create my likeness · 5 photos** workflow in My profile adds guided front/three-quarter/profile capture, reviewed alignment, bounded head fitting, local color matching and multi-view texture blending. This experimental preview stays private to the current tab; it is not a scan or a published digital twin. See `AVATARS.md`.

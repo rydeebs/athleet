@@ -15,3 +15,9 @@
 @media(max-width:540px){.portrait-editor{grid-template-columns:1fr;gap:18px}.portrait-editor canvas{width:auto;height:240px;max-width:100%;margin:auto}.photo-panel{padding:15px}.photo-panel input[type=file]{max-width:100%}dialog:has(.portrait-editor){padding:20px}.portrait-editor .field{margin-bottom:6px}}
 
 .swatch:disabled{opacity:.35;cursor:not-allowed}
+
+/* Optional five-view likeness editor. */
+dialog:has(.likeness-editor){width:1000px;max-width:calc(100vw - 24px)}
+.likeness-steps{display:flex;gap:7px;flex-wrap:wrap;margin:20px 0}.likeness-steps button{background:#edf0e6;color:var(--green);border:1px solid var(--line);border-radius:5px;font:inherit;font-size:12px;padding:10px 12px;cursor:pointer}.likeness-steps [aria-current=step]{background:var(--green);color:#fff}
+.likeness-editor{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:26px}.likeness-editor h3{font-size:22px}.likeness-editor canvas{display:block;max-width:100%;width:auto;height:360px;object-fit:contain;cursor:crosshair;margin:12px auto;background:#e7ebe1}.likeness-editor input[type=file]{width:100%;font-size:12px}.likeness-editor .check{margin:18px 0;align-items:flex-start}.likeness-editor .check input{flex:none}.likeness-progress{font-weight:600;margin:20px 0 12px}.likeness-empty{min-height:210px;display:grid;place-content:center;text-align:center;line-height:1.8;background:#edf0e6;border:1px dashed #9dab93;border-radius:8px;color:#687563}.likeness-editor .inline-actions{flex-wrap:wrap}.likeness-editor .button{font-size:12px;padding:12px}.likeness-editor .help{font-size:12px;line-height:1.6}
+@media(max-width:650px){.likeness-editor{grid-template-columns:1fr;gap:10px}.likeness-editor canvas{height:auto;max-height:350px;max-width:100%}.likeness-steps button{font-size:11px;padding:8px}.likeness-editor .fields{grid-template-columns:1fr 1fr}}

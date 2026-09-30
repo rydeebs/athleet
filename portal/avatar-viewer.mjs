@@ -4,6 +4,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {DecalGeometry} from 'three/addons/geometries/DecalGeometry.js';
 import {avatarAssetRoot} from './avatar.mjs';
+import {fittedHeadGeometry,projectedEyeGeometry} from './likeness-render.mjs';
 import {imagePixels,bakePortrait,portraitEyeGeometry} from './portrait-texture.mjs';
 import {medianColor} from './photo-color.mjs';
 import {skins} from './model.mjs';
@@ -88,15 +89,17 @@ export class AvatarViewer{
   const c=this.config,signature=[c.face,c.faceVersion,c.avatar.presentation,c.avatar.build].join('|');
   if(this.faceSignature===signature){if(this.portraitMap)this.body.getObjectByName('Body').material.map=this.portraitMap;if(this.faceMap)this.body.getObjectByName('Eyes').material.map=this.faceMap;return;}
   this.clearFace();if(!c.face){this.faceSignature=signature;return;}
-  const [map,hairMap]=await Promise.all([textures.loadAsync(c.face),c.faceDetails?.hair?textures.loadAsync(c.faceDetails.hair):null]);map.colorSpace=THREE.SRGBColorSpace;map.flipY=false;
-  if(version!==this.version||this.disposed){map.dispose();hairMap?.dispose();return;}
-  const body=this.body.getObjectByName('Body'),canvas=bakePortrait(imagePixels(this.skinBase.image),body,imagePixels(map.image),hairMap?imagePixels(hairMap.image):null,c.faceDetails||{});
+  const maps=await Promise.all([textures.loadAsync(c.face),c.faceDetails?.hair?textures.loadAsync(c.faceDetails.hair):null,...(c.faceDetails?.multiViews||[]).map(v=>textures.loadAsync(v.url))]);const [map,hairMap]=maps;map.colorSpace=THREE.SRGBColorSpace;map.flipY=false;
+  if(version!==this.version||this.disposed){maps.forEach(m=>m?.dispose());return;}
+  const body=this.body.getObjectByName('Body');if(c.faceDetails?.fit){this.originalBodyGeometry=body.geometry;body.geometry=fittedHeadGeometry(body,c.faceDetails.fit);}
+  const views=(c.faceDetails?.multiViews||[]).map((v,i)=>({...v,image:imagePixels(maps[i+2].image)}));
+  const canvas=bakePortrait(imagePixels(this.skinBase.image),body,imagePixels(map.image),hairMap?imagePixels(hairMap.image):null,c.faceDetails||{},views);maps.slice(2).forEach(m=>m.dispose());
   this.portraitMap=new THREE.CanvasTexture(canvas);this.portraitMap.colorSpace=THREE.SRGBColorSpace;this.portraitMap.flipY=false;this.portraitMap.anisotropy=4;body.material.map=this.portraitMap;body.material.needsUpdate=true;
   const eyeCanvas=document.createElement('canvas');eyeCanvas.width=map.image.width;eyeCanvas.height=map.image.height;const eyeCtx=eyeCanvas.getContext('2d');eyeCtx.filter=`brightness(${Math.pow(2,(c.faceDetails?.exposure||0)/100)})`;eyeCtx.drawImage(map.image,0,0);map.image=eyeCanvas;map.needsUpdate=true;
-  const eyes=this.body.getObjectByName('Eyes');if(eyes){this.originalEyeGeometry=eyes.geometry;eyes.geometry=portraitEyeGeometry(eyes);eyes.material.map=map;eyes.material.color.set('#ffffff');eyes.material.needsUpdate=true;}
+  const eyes=this.body.getObjectByName('Eyes');if(eyes){this.originalEyeGeometry=eyes.geometry;if(c.faceDetails?.fit){const fitted=fittedHeadGeometry(eyes,c.faceDetails.fit);eyes.geometry=fitted;eyes.geometry=projectedEyeGeometry(eyes,views[0].camera,map.image.width,map.image.height);fitted.dispose();}else eyes.geometry=portraitEyeGeometry(eyes);eyes.material.map=map;eyes.material.color.set('#ffffff');eyes.material.needsUpdate=true;}
   hairMap?.dispose();this.faceMap=map;this.faceSignature=signature;
  }
- clearFace(){const eyes=this.body?.getObjectByName('Eyes');if(eyes&&this.originalEyeGeometry){eyes.geometry.dispose();eyes.geometry=this.originalEyeGeometry;}this.originalEyeGeometry=null;this.portraitMap?.dispose();this.portraitMap=null;this.faceMap?.dispose();this.faceMap=null;this.faceSignature='';}
+ clearFace(){const body=this.body?.getObjectByName('Body');if(body&&this.originalBodyGeometry){body.geometry.dispose();body.geometry=this.originalBodyGeometry;}this.originalBodyGeometry=null;const eyes=this.body?.getObjectByName('Eyes');if(eyes&&this.originalEyeGeometry){eyes.geometry.dispose();eyes.geometry=this.originalEyeGeometry;}this.originalEyeGeometry=null;this.portraitMap?.dispose();this.portraitMap=null;this.faceMap?.dispose();this.faceMap=null;this.faceSignature='';}
  clearLogo(){if(this.decal){this.scene.remove(this.decal);this.decal.geometry.dispose();this.decal.material.map?.dispose();this.decal.material.dispose();this.decal=null;}}
  clearModel(){this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
  reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
