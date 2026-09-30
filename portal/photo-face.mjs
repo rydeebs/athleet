@@ -1,4 +1,4 @@
-import {sampleCheeks,colorHex} from './photo-color.mjs';
+import {sampleCheeks,colorHex,medianColor} from './photo-color.mjs';
 // Local-only portrait fitting. No uploads, biometric inference, or photo persistence.
 export const portraitLimits={bytes:8*1024*1024,pixels:32_000_000,types:['image/jpeg','image/png','image/webp']};
 export function validatePortrait(file){
@@ -38,23 +38,29 @@ export async function applyPortrait(settings){
  try{const {segmentPortrait}=await import('./photo-segmentation.mjs');segmentation=await segmentPortrait(extended);}catch{throw new Error('Could not load local hair/skin analysis. Check your connection, then try again. Your photo has not been uploaded.');}
  if(request!==pending)return false;
  const extContext=extended.getContext('2d'),pixels=extContext.getImageData(0,0,extended.width,extended.height);
- const rgb=sampleCheeks(pixels.data,extended.width,extended.height,segmentation.skin,segmentation.width,segmentation.height,{offsetX:256,offsetY:256,point:settings.skinPoint,exposure:Number(settings.skinExposure)||0});
+ const rgb=sampleCheeks(pixels.data,extended.width,extended.height,segmentation.skin,segmentation.width,segmentation.height,{offsetX:256,offsetY:256,point:settings.skinPoint,exposure:0});
  if(!rgb)throw new Error('Could not sample clear skin. Align your face, then click a clear cheek area in the photo and apply again.');
+ // Remove background and clothing even inside the face oval, so shoulders or
+ // scenery cannot be painted onto the temple or ear.
+ const facePixels=ctx.getImageData(0,0,512,640);
+ for(let y=0;y<640;y++)for(let x=0;x<512;x++){const j=Math.floor((y+256)/extended.height*segmentation.height)*segmentation.width+Math.floor((x+256)/extended.width*segmentation.width),alpha=Math.max(0,Math.min(1,(1-segmentation.background[j]-segmentation.clothes[j]-.15)/.7));facePixels.data[(y*512+x)*4+3]*=alpha;}
+ ctx.putImageData(facePixels,0,0);
  const mask=document.createElement('canvas');mask.width=512;mask.height=640;const m=mask.getContext('2d');
  m.translate(256,320);m.scale(230,307);const gradient=m.createRadialGradient(0,0,.62,0,0,1);gradient.addColorStop(0,'#fff');gradient.addColorStop(.65,'#fffffff0');gradient.addColorStop(1,'#ffffff00');m.fillStyle=gradient;m.fillRect(-1,-1,2,2);
  ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,0,0);ctx.globalCompositeOperation='source-over';
- let nextHair=null;
+ let nextHair=null,hairBounds=null,hairColor=null;
  if(settings.includeHair&&settings.hairLength!=='none'){
   // Class 1 is hair; remove background, clothes and skin rather than cutting an oval.
-  let count=0;
-  for(let y=0;y<extended.height;y++)for(let x=0;x<extended.width;x++){const i=(y*extended.width+x)*4,j=Math.floor(y/extended.height*segmentation.height)*segmentation.width+Math.floor(x/extended.width*segmentation.width);const alpha=Math.max(0,Math.min(1,(segmentation.hair[j]-.18)/.62));pixels.data[i+3]=Math.round(pixels.data[i+3]*alpha);if(alpha>.5)count++;}
-  if(count<80)throw new Error('No clear hair found. Include the top and sides of your hair in the photo, or choose No hair.');
+  let count=0,top=extended.height,left=extended.width,right=0,line=256;const colors=[];
+  for(let y=0;y<extended.height;y++)for(let x=0;x<extended.width;x++){const i=(y*extended.width+x)*4,j=Math.floor(y/extended.height*segmentation.height)*segmentation.width+Math.floor(x/extended.width*segmentation.width);const alpha=Math.max(0,Math.min(1,(segmentation.hair[j]-.18)/.62));pixels.data[i+3]=Math.round(pixels.data[i+3]*alpha);if(alpha>.65){count++;if(y<600){top=Math.min(top,y);left=Math.min(left,x);right=Math.max(right,x);if(x>460&&x<564&&y<512)line=Math.max(line,y);if(count%16===0)colors.push(Array.from(pixels.data.slice(i,i+3)));}}}
+  if(count<80||top>=600||left>=right)throw new Error('No clear hair found. Include the top and sides of your hair in the photo, or choose No hair.');
+  hairBounds={top,left,right,line:Math.max(top+24,line)};hairColor=medianColor(colors)||[35,28,23];
   extContext.putImageData(pixels,0,0);nextHair=await new Promise(resolve=>extended.toBlob(resolve,'image/png'));
  }
  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw new Error('Could not prepare the photo. Try again.');if(request!==pending)return false;
  if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);
  faceUrl=URL.createObjectURL(blob);hairUrl=nextHair?URL.createObjectURL(nextHair):'';
- details={skin:colorHex(rgb),hair:hairUrl,hairLength:settings.hairLength||'short',hairHeight:extended.height,includeHair:!!settings.includeHair};revision++;return true;
+ details={skin:colorHex(rgb),exposure:Number(settings.skinExposure)||0,hairBounds,hairColor,hair:hairUrl,hairLength:settings.hairLength||'short',hairHeight:extended.height,includeHair:!!settings.includeHair};revision++;return true;
 }
 export function clearPortrait(){pending++;if(sourceUrl)URL.revokeObjectURL(sourceUrl);if(faceUrl)URL.revokeObjectURL(faceUrl);if(hairUrl)URL.revokeObjectURL(hairUrl);source=null;sourceUrl='';faceUrl='';hairUrl='';details=null;revision++;}
 
