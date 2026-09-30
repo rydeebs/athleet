@@ -42,6 +42,8 @@ No payments are processed. Requests reserve a single placement on a single race 
 
 Avatars use textured 3D geometry with interactive rotation, outfit coverage, and surface-attached sponsor logos. Discovery cards use lightweight generic outfit posters. See [AVATARS.md](AVATARS.md) for the asset pipeline, scalability, and optional personal-scan roadmap.
 
+Avatar choices include Male/Female, build, skin tone, kit color, and preview clothing. A private portrait face preview is available in My profile: align a photo and apply it to the generic head. Photos stay in the current tab and are not saved or published. This is approximate texture projection, not 3D likeness reconstruction.
+
 Avatar choices are optional visual preferences and do not affect pricing. No body image, ethnicity, exact age, height, or weight is required. Social handles are transmitted only when the user requests a lookup.
 
 Photography: Unsplash, Leona Lee (xGzdmd5lB6I), Miguel Alcântara (nFz4XuVpPD8), Ryan Snaadt (BoCR26LwEcw). No endorsement implied.

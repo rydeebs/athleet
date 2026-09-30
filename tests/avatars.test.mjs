@@ -28,9 +28,9 @@ test('discovery cards use bounded local poster assets rather than canvases',asyn
   const path=avatarPoster({presentation},outfit);assert.ok((await stat('.'+path)).size<100_000);
   assert.ok(!avatarSvg({presentation},outfit).includes('canvas'));
  }
- assert.equal(avatarPoster({presentation:'../../private'},'../../private'),'/assets/athletes/v1/neutral-singlet.webp');
+ assert.equal(avatarPoster({presentation:'../../private'},'../../private'),'/assets/athletes/v1/masculine-singlet.webp');
 });
 test('viewer configuration cannot inject markup and does not expose unoffered controls',()=>{
  const html=avatarStudio({available:['back'],brand:'\" onmouseover=\"alert(1)',logo:'\"><script>alert(1)</script>'});
- assert.ok(!html.includes('<script>'));assert.ok(!html.includes('data-zone="chest"'));assert.ok(html.includes('data-zone="back"'));
+ assert.ok(!html.includes('<script>'));assert.ok(!html.includes('data-zone="chest"'));assert.ok(html.includes('&quot;available&quot;:[&quot;back&quot;]'));assert.ok(!html.includes('model-controls'));assert.ok(!html.includes('body-hotspot'));
 });

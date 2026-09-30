@@ -14,7 +14,7 @@ export class AvatarViewer{
   this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(32,1,.05,30);this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
   this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.12;
   this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','Rotate athlete with arrow keys. Plus and minus zoom.');
-  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=false;this.controls.minPolarAngle=.65;this.controls.maxPolarAngle=2.05;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
+  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=true;this.controls.minDistance=.35;this.controls.maxDistance=4.8;this.controls.minPolarAngle=.65;this.controls.maxPolarAngle=2.05;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
   this.scene.add(new THREE.HemisphereLight(0xfff6e8,0x63756a,2.4));
   for(const [pos,color,intensity] of [[[-3,4,4],0xfff4e5,3],[[3,2,2],0xd9eaff,1.6],[[1,3,-3],0xffffff,3]]){const light=new THREE.DirectionalLight(color,intensity);light.position.set(...pos);this.scene.add(light);}
   const floor=new THREE.Mesh(new THREE.CircleGeometry(.5,64),new THREE.MeshBasicMaterial({color:0x63785e,transparent:true,opacity:.1,depthWrite:false}));floor.rotation.x=-Math.PI/2;floor.position.y=-.006;this.scene.add(floor);this.floor=floor;
@@ -26,7 +26,7 @@ export class AvatarViewer{
  async mount(stage,config){
   const version=++this.version,old=this.config;this.config=config;
   if(this.stage!==stage){this.stage?.removeEventListener('click',this.onClick);this.resizeObserver.disconnect();this.stage=stage;stage.querySelector('.model-viewport').append(this.canvas);stage.addEventListener('click',this.onClick);this.resizeObserver.observe(stage);}
-  if(!old||old.view!==config.view||old.viewKey!==config.viewKey)this.reset();this.resize();
+  if(!old||old.view!==config.view||old.viewKey!==config.viewKey||old.closeup!==config.closeup)this.reset();this.resize();
   try{
    const a=config.avatar,sex=a.presentation==='feminine'?'female':'male',tone=skins.indexOf(a.skin),hair=a.presentation==='feminine'?'ponytail01':'short02';
    const [asset,skin,hairMap,eyeMap,shoeMap]=await Promise.all([model(a.presentation),texture(`skin-${sex}-${tone>=3?'dark':'light'}.jpg`),texture('hair-'+hair+'.webp'),texture('eyes.jpg'),texture('shoes.jpg')]);
@@ -43,8 +43,8 @@ export class AvatarViewer{
     else{m.map=null;m.color.set(a.kit);m.side=THREE.DoubleSide;m.roughness=.9;}
     m.needsUpdate=true;if(o.visible&&!['Hair','Eyes','Shoes'].includes(name))this.surfaces.push(o);
    });
-   this.body.updateMatrixWorld(true);this.findAnchors();await this.updateLogo(version);if(version!==this.version)return;
-   stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.draw();
+   this.body.updateMatrixWorld(true);this.findAnchors();await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
+   stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.draw();
   }catch(error){if(version===this.version)this.fail('3D unavailable. Outfit preview shown; use the placement list below.');throw error;}
  }
  findAnchors(){
@@ -69,9 +69,28 @@ export class AvatarViewer{
   const material=new THREE.MeshStandardMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.85});
   this.decal=new THREE.Mesh(decalGeometry,material);this.decal.renderOrder=5;this.scene.add(this.decal);
  }
+ async updateFace(version){
+  const c=this.config,signature=[c.face,c.faceVersion,c.avatar.presentation,c.avatar.build].join('|');
+  if(this.faceSignature===signature)return;this.clearFace();if(!c.face){this.faceSignature=signature;return;}
+  const map=await new THREE.TextureLoader().loadAsync(c.face);map.colorSpace=THREE.SRGBColorSpace;
+  if(version!==this.version||this.disposed){map.dispose();return;}
+  this.faceSignature=signature;this.faceMap=map;this.faceMeshes=[];
+  // Project the aligned portrait onto the existing face and eye surfaces. This
+  // personalizes texture only: head geometry, profile and hair remain generic.
+  for(const name of ['Body','Eyes']){
+   const mesh=this.body.getObjectByName(name);if(!mesh)continue;
+   const geometry=mesh.geometry.clone(),p=geometry.attributes.position,v=new THREE.Vector3();
+   for(let i=0;i<p.count;i++){mesh.getVertexPosition(i,v);p.setXYZ(i,v.x,v.y,v.z);}geometry.morphAttributes={};geometry.computeVertexNormals();
+   const surface=new THREE.Mesh(geometry);surface.matrixWorld.copy(mesh.matrixWorld);
+   const decal=new DecalGeometry(surface,new THREE.Vector3(0,1.622,.14),new THREE.Euler(),new THREE.Vector3(.18,.225,.19));geometry.dispose();
+   const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-6,toneMapped:false});
+   const face=new THREE.Mesh(decal,material);face.renderOrder=4;this.faceMeshes.push(face);this.scene.add(face);
+  }
+ }
+ clearFace(){for(const face of this.faceMeshes||[]){this.scene.remove(face);face.geometry.dispose();face.material.dispose();}this.faceMap?.dispose();this.faceMap=null;this.faceMeshes=[];this.faceSignature='';}
  clearLogo(){if(this.decal){this.scene.remove(this.decal);this.decal.geometry.dispose();this.decal.material.map?.dispose();this.decal.material.dispose();this.decal=null;}}
- clearModel(){this.clearLogo();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
- reset(){this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
+ clearModel(){this.clearLogo();this.clearFace();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
+ reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
  control(action){if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
  resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.draw();}
  draw(){if(this.disposed||!this.stage)return;this.renderer.render(this.scene,this.camera);const viewport=this.stage.querySelector('.model-viewport'),w=viewport.clientWidth,h=viewport.clientHeight;

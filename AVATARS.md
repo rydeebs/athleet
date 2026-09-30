@@ -4,13 +4,13 @@ The portal now uses genuine 3D geometry and textured skin. These are reusable ge
 
 ## What ships
 
-- Three presentation templates, each with lean and strong morph targets plus an athletic base. Six skin tones and five kit colors are stored in the existing profile configuration.
+- Male and Female avatar choices, each with lean and strong morph targets plus an athletic base. Legacy neutral profiles migrate to the Male preset; the old neutral asset remains for compatibility. Six skin tones and five kit colors are stored in the existing profile configuration.
 - Seven race outfit configurations assembled from fitted garment meshes. Tattoos use exposed skin; kit logos use garment surfaces. The model changes with each race's outfit.
-- Three.js rotation, keyboard controls, zoom, front/back reset, surface-projected sponsor text and PNG/JPEG/WebP artwork, and occlusion-aware placement markers.
+- Three.js rotation, keyboard controls, zoom, front/back reset, surface-projected sponsor text and PNG/JPEG/WebP artwork, and a clean model view without floating placement markers or an icon toolbar. Select placements from the list; drag to rotate and scroll/pinch to zoom.
 - Static WebP outfit previews in discovery, a lazy-loaded viewer on detail/editor screens, shared model/texture caching, one canvas per studio, render-on-change, and cleanup on navigation. No automatic animation or tracking.
 - Poster/error fallback if WebGL or assets fail. Placement lists remain usable. Uploaded logos stay in the current browser session.
 
-The geometry is normalized to a 1.75 m template for placement consistency. Height, weight, age and ethnicity are not collected or inferred. Appearance does not alter pricing. Preview logos are approximate; final size, visibility, event rules and artwork remain an athlete/sponsor agreement. The tri-suit and wetsuit represent coverage, not a particular manufacturer's garment. Discovery posters show a standard build, skin tone and kit, rather than every profile variation.
+The geometry is normalized to a 1.75 m template for placement consistency. Gender is chosen explicitly as Male or Female. Height, weight, age and ethnicity are not collected or inferred. Appearance does not alter pricing. Preview logos are approximate; final size, visibility, event rules and artwork remain an athlete/sponsor agreement. The tri-suit and wetsuit represent coverage, not a particular manufacturer's garment. Discovery posters show a standard build, skin tone and kit, rather than every profile variation.
 
 ## Scale
 
@@ -41,3 +41,13 @@ A scan upload service is not included in this release. To offer Marc-style perso
 4. Store optimized public derivatives on object storage/CDN with signed upload URLs, per-athlete ownership, deletion controls, consent and retention rules for private originals.
 
 Aim initially for 30–60k triangles, 1–2K texture maps and a 2–5 MB mobile derivative; tune against real target phones. Add Meshopt/KTX2 only when measurements show a benefit. Do not ask every athlete to supply 300 photos: generic avatars remain the default; personal scans should be an optional premium workflow.
+
+## Portrait face preview (beta)
+
+In Athlete portal → My profile, upload a front-facing JPG, PNG or WebP portrait (up to 8 MB, 32 MP), align its eyes/chin in the crop dialog and choose Apply to avatar. The Face / Full body tabs help inspect the result. Adjustment and removal are supported. Preview clothing is saved with avatar preferences and used as the starting outfit for new races; each race still has its own final outfit.
+
+This is local photo projection onto the existing head and eye meshes, with an oval feathered edge. It does not generate head geometry, change hair, infer gender/ethnicity or reconstruct a full body. A side-facing photo will distort. Choose a matching skin swatch to reduce the boundary contrast. An accurate personal likeness still requires a scan or a dedicated head-reconstruction pipeline.
+
+The portrait and cropped texture remain in document memory/blob URLs. They are not sent to an API, written into profile JSON, saved to browser storage or shown to sponsors. They survive navigation inside the athlete portal but disappear on reload, sign-out or closing the tab. Save profile persists only gender/build/skin/kit/outfit preferences. This private beta is ready for evaluating portrait fit before implementing consented storage and publication.
+
+Implementation references: [Canvas image cropping](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage) and [Three.js surface decals](https://threejs.org/docs/pages/DecalGeometry.html).

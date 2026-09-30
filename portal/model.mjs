@@ -1,7 +1,7 @@
 import {raceTypes} from '../races.mjs';
 export {raceTypes};
 export const outfits = {
- singlet: {label:'Running singlet', chest:'kit', back:'kit', arms:'skin', thighs:'kit'},
+ singlet: {label:'Tank top (no sleeves) + shorts', chest:'kit', back:'kit', arms:'skin', thighs:'kit'},
  shirtless: {label:'Shirtless + shorts', chest:'skin', back:'skin', arms:'skin', thighs:'kit'},
  'sports-bra': {label:'Sports bra + shorts', chest:'kit', back:'kit', arms:'skin', thighs:'kit'},
  tee: {label:'T-shirt + shorts', chest:'kit', back:'kit', arms:'kit', thighs:'kit'},
@@ -12,7 +12,7 @@ export const outfits = {
 export const zones = ['chest','back','left-arm','right-arm','left-thigh','right-thigh'];
 export const skins = ['#f0cbb2','#d6a17c','#b77d55','#905b3b','#69432f','#422c24'];
 export const kitColors = ['#283e34','#24282c','#54697c','#854b40','#c8cdbe'];
-export const defaultAvatar = {skin:skins[2],build:'athletic',presentation:'neutral',kit:kitColors[0]};
+export const defaultAvatar = {skin:skins[2],build:'athletic',presentation:'masculine',gender:'male',outfit:'singlet',kit:kitColors[0]};
 export const defaultProfile = {display_name:'',location:'',bio:'',avatar:defaultAvatar,socials:[],audience:null};
 export const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n || 0);
 export const count = n => new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(n || 0);
@@ -25,11 +25,12 @@ export function placementInfo(zone,outfit='singlet') {
  const name=zone==='chest'?'Front torso':zone==='back'?'Upper back':zone.replaceAll('-',' ').replace(/^./,c=>c.toUpperCase());
  return {id:zone,name,material,label:`${name} · ${material==='skin'?'temporary tattoo':'kit logo'}`};
 }
-export function normalizeAvatar(value={}) {return {
+export function normalizeAvatar(value={}) {const gender=value.gender==='female'||(!['male','female'].includes(value.gender)&&value.presentation==='feminine')?'female':'male';return {
  skin:skins.includes(value.skin)?value.skin:defaultAvatar.skin,
  kit:kitColors.includes(value.kit)?value.kit:defaultAvatar.kit,
  build:['lean','athletic','strong'].includes(value.build)?value.build:'athletic',
- presentation:['neutral','feminine','masculine'].includes(value.presentation)?value.presentation:'neutral'
+ gender,presentation:gender==='female'?'feminine':'masculine',
+ outfit:gender==='female'&&value.outfit==='shirtless'?'sports-bra':gender==='male'&&value.outfit==='sports-bra'?'shirtless':Object.hasOwn(outfits,value.outfit)?value.outfit:'singlet'
 };}
 export function newRace() {return {event_name:'',race_date:'',location:'',discipline:'Road running',distance:'5K',expected_field:null,finish_band:'',outfit:'singlet',phase:'Full race',placements:['chest','left-arm'],asking_price:250,deliverables:'1 race-day placement, 1 social post, and event photo proof.',notes:'',status:'draft',rules_confirmed:false};}
 export function validateRace(race) {

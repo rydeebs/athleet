@@ -33,7 +33,7 @@ test('reserved or unpublished inventory is excluded from discovery',()=>{
 });
 test('the sponsor canvas exposes only offered placements and escapes brand text',()=>{
  const markup=avatarStudio({avatar:defaultAvatar,outfit:'shirtless',available:['chest'],selected:['chest'],active:'chest',brand:'<img onerror=alert(1)>'});
- assert.ok(markup.includes('data-zone="chest"'));assert.ok(!markup.includes('data-zone="left-arm"'));
+ assert.ok(markup.includes('&quot;available&quot;:[&quot;chest&quot;]'));assert.ok(!markup.includes('class="body-hotspot'));assert.ok(!markup.includes('class="model-controls'));
  assert.ok(markup.includes('&lt;img'));assert.ok(!markup.includes('<img onerror'));
  assert.deepEqual(normalizeAvatar({skin:'" onload="bad',kit:'javascript:bad',build:'unknown'}),defaultAvatar);
 });
