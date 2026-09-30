@@ -8,3 +8,7 @@ export function validateAccounts(accounts){
  return {accounts:active.map(a=>({...a,handle:normalizeHandle(a.handle),followers:Number(a.followers)}))};
 }
 export function estimateAudience(accounts){const total=accounts.reduce((sum,a)=>sum+a.followers,0);const round=n=>Math.round(n/5)*5;return {total,low:round(100+total*.01),high:round(200+total*.03)};}
+// Public CORS-enabled fallback for X when a shared hosting IP is throttled.
+export async function lookupXInBrowser(account,fetcher=fetch){
+ try{const response=await fetcher('https://api.fxtwitter.com/'+encodeURIComponent(account.handle),{signal:AbortSignal.timeout(8000),credentials:'omit'});if(!response.ok)return account;const data=await response.json();const user=data.user;if(data.code!==200||user?.screen_name?.toLowerCase()!==account.handle.toLowerCase()||user.protected||!Number.isSafeInteger(user.followers)||user.followers<0)return account;return {...account,status:'ok',followers:user.followers,approximate:false,sourceUrl:'https://x.com/'+encodeURIComponent(account.handle),via:'FxTwitter public profile',checkedAt:new Date().toISOString(),message:undefined};}catch{return account;}
+}

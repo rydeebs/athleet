@@ -1,7 +1,7 @@
 const photos={gym:'https://images.unsplash.com/photo-1743993414654-0be2b73a9620?auto=format&fit=crop&w=1200&q=85',run:'https://images.unsplash.com/photo-1771166446975-2e9e9a9cd3d0?auto=format&fit=crop&w=800&q=85',track:'https://images.unsplash.com/photo-1605822218374-7222c044e434?auto=format&fit=crop&w=800&q=85'};
 for(const image of document.querySelectorAll('[data-photo]')){if(photos[image.dataset.photo])image.src=photos[image.dataset.photo];}
 const menu=document.querySelector('.menu-toggle');const nav=document.querySelector('nav');menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('open',open);});nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');}));
-import {platforms, normalizeHandle, estimateAudience} from './audience.mjs';
+import {platforms, normalizeHandle, estimateAudience, lookupXInBrowser} from './audience.mjs';
 import {raceTypes,raceSummary} from './races.mjs';
 const money=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
 let currentEstimate=null;
@@ -87,6 +87,7 @@ audienceForm.addEventListener('submit',async event=>{
  let result;
  try{
   const response=await fetch('/api/audience',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accounts}),signal:AbortSignal.timeout(35000)});result=await response.json();if(!response.ok)throw new Error(result.error||'Lookup unavailable. Please try again.');
+  result.accounts=await Promise.all(result.accounts.map(account=>account.platform==='x'&&account.status!=='ok'?lookupXInBrowser(account):account));
   result.accounts.forEach(account=>{const row=rows.find(r=>r.dataset.platform===account.platform&&normalizeHandle(r.querySelector('.handle-input').value)===account.handle);if(row)row.querySelector('.account-status').textContent=account.status==='ok'?`${account.approximate?'≈ ':''}${account.followers.toLocaleString('en-US')} followers found`:account.message;});
   if(result.accounts.some(a=>a.status!=='ok')){status.textContent='Some accounts could not be read. Retry, correct the handle, or remove unavailable accounts. We won’t calculate a combined total until every included account is found.';return;}
  }catch(error){status.textContent=error.name==='TimeoutError'?'Lookup timed out. Please try again.':error.message;rows.forEach(row=>{if(row.querySelector('.account-status').textContent==='Checking…')row.querySelector('.account-status').textContent='Lookup unavailable';});return;}

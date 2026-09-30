@@ -12,7 +12,7 @@ One race, multi-race, and full-season packages support up to 12 events. Road run
 
 ## Public follower lookups
 
-POST `/api/audience` accepts up to five `{platform, handle}` records. Instagram, TikTok, YouTube, and Threads use public profile metadata, with Jina Reader as a fallback. X uses the public FxTwitter profile endpoint. No credentials or social login are collected. Only allowlisted platform URLs are requested. Identity checks, timeouts, response-size caps, validation, and a bounded per-isolate limiter are included. The private Sites access gate is preserved.
+POST `/api/audience` accepts up to five `{platform, handle}` records. Instagram, TikTok, YouTube, and Threads use public profile metadata, with Jina Reader as a fallback. X uses the public FxTwitter profile endpoint, with a browser CORS fallback when the shared hosting IP is blocked. No credentials or social login are collected. Only allowlisted platform URLs are requested. Identity checks, timeouts, response-size caps, validation, and a bounded per-isolate limiter are included. The private Sites access gate is preserved.
 
 Counts come from profile-owned metadata (not suggested accounts), include a source URL and checked timestamp, and mark abbreviated counts as approximate. Every selected account must succeed before a combined estimate is shown. Login walls, timeouts, deleted/private profiles and throttling produce visible errors; they are never treated as zero. Availability depends on each platform and public reader service. This is best-effort public lookup, not an official platform integration or verified account ownership. Platform page changes may require parser maintenance.
 
