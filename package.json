@@ -1,1 +1,10 @@
-{"name":"athleet","private":true,"version":"1.0.0","scripts":{"dev":"python3 -m http.server 4173","build":"node build.mjs"}}
+{
+  "name": "athleet",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node build.mjs && node dev.mjs",
+    "build": "node build.mjs"
+  },
+  "type": "module"
+}
