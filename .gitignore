@@ -1,2 +1,6 @@
 .DS_Store
 node_modules/
+.vercel/
+dist/public/
+.env*
+!.env.example

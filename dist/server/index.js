@@ -67,19 +67,103 @@ export async function lookupAccount(account,fetcher=fetch){
  return {...account,status:'ok',...count,sourceUrl,via,checkedAt:new Date().toISOString()};
 }
 
-const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
-// A bounded per-isolate limiter avoids unbounded memory; Sites remains owner-private.
-const limits=new Map();
+
+const MAX_BODY_BYTES = 5000;
+const WINDOW_MS = 60_000;
+const MAX_REQUESTS = 6;
+const MAX_CLIENTS = 1000;
+
+function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      ...headers,
+    },
+  });
+}
+
+async function readBody(request) {
+  if (Number(request.headers.get('Content-Length')) > MAX_BODY_BYTES) {
+    throw new RangeError('Request too large.');
+  }
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let body = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new RangeError('Request too large.');
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+    return body + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export function createAudienceHandler({
+  lookup = lookupAccount,
+  clientKey = () => 'local',
+  now = Date.now,
+} = {}) {
+  // Best-effort protection per warm instance, not a distributed/global quota.
+  const limits = new Map();
+
+  return async function handleAudience(request) {
+    if (request.method !== 'POST') {
+      return json({ error: 'Use POST.' }, 405, { Allow: 'POST' });
+    }
+    const origin = request.headers.get('Origin');
+    if (origin && origin !== new URL(request.url).origin) {
+      return json({ error: 'Invalid request origin.' }, 403);
+    }
+    if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json') {
+      return json({ error: 'Expected JSON.' }, 415);
+    }
+
+    const key = clientKey(request) || 'unknown';
+    const time = now();
+    for (const [ip, entry] of limits) {
+      if (time - entry.start >= WINDOW_MS) limits.delete(ip);
+    }
+    const current = limits.get(key);
+    if (current?.count >= MAX_REQUESTS) {
+      const retry = Math.ceil((WINDOW_MS - (time - current.start)) / 1000);
+      return json({ error: 'Please wait a minute before trying again.' }, 429, { 'Retry-After': String(retry) });
+    }
+    if (!current && limits.size >= MAX_CLIENTS) limits.delete(limits.keys().next().value);
+    limits.set(key, current ? { ...current, count: current.count + 1 } : { start: time, count: 1 });
+
+    let accounts;
+    try {
+      const input = JSON.parse(await readBody(request));
+      accounts = validateLookup(input?.accounts);
+    } catch (error) {
+      return json({ error: error instanceof RangeError ? 'Request too large.' : 'Enter one to five valid, distinct social accounts.' }, error instanceof RangeError ? 413 : 400);
+    }
+    try {
+      return json({ accounts: await Promise.all(accounts.map(account => lookup(account))) });
+    } catch {
+      return json({ error: 'Lookup is temporarily unavailable. Please try again.' }, 503);
+    }
+  };
+}
+
+const handleAudience=createAudienceHandler({clientKey:request=>request.headers.get('CF-Connecting-IP')});
 export default {async fetch(request){
  const url=new URL(request.url);
  if(url.pathname==='/api/audience'){
-  if(request.method!=='POST')return json({error:'Use POST.'},405);
-  const origin=request.headers.get('Origin');if(origin&&origin!==url.origin)return json({error:'Invalid request origin.'},403);
-  if(!request.headers.get('Content-Type')?.includes('application/json'))return json({error:'Expected JSON.'},415);
-  const ip=request.headers.get('CF-Connecting-IP')||'local';const now=Date.now();const current=limits.get(ip);if(current&&now-current.start<60000&&current.count>=6)return json({error:'Please wait a minute before trying again.'},429);
-  if(limits.size>1000)limits.clear();limits.set(ip,current&&now-current.start<60000?{...current,count:current.count+1}:{start:now,count:1});
-  let accounts;try{const body=await request.text();if(body.length>5000)return json({error:'Request too large.'},413);accounts=validateLookup(JSON.parse(body).accounts);}catch(error){return json({error:error.message||'Invalid accounts.'},400);}
-  const results=await Promise.all(accounts.map(account=>lookupAccount(account)));return json({accounts:results});
+  return handleAudience(request);
  }
  if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405});
  const path=url.pathname==='/'?'/index.html':url.pathname;const asset=assets[path];if(!asset)return new Response('Not found',{status:404,headers:{'Content-Type':'text/plain'}});

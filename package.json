@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "node build.mjs && node dev.mjs",
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
+  "engines": { "node": "22.x" },
   "type": "module"
 }
