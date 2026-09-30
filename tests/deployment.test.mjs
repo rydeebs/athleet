@@ -93,8 +93,8 @@ test('Vercel serves only public assets and includes the audience function', asyn
   assert.equal(config.framework, null);
   assert.equal(config.outputDirectory, 'dist/public');
   assert.equal(config.functions['api/audience.js'].maxDuration, 30);
-  assert.deepEqual((await readdir(config.outputDirectory)).sort(), ['app.js', 'audience.mjs', 'index.html', 'portal.css', 'portal.html', 'portal.js', 'races.mjs', 'style.css']);
-  for (const file of (await readdir(config.outputDirectory)).filter(file => file !== 'portal.js')) {
+  assert.deepEqual((await readdir(config.outputDirectory)).sort(), ['app.js', 'assets', 'audience.mjs', 'chunks', 'index.html', 'portal.css', 'portal.html', 'portal.js', 'races.mjs', 'style.css']);
+  for (const file of (await readdir(config.outputDirectory)).filter(file => !['portal.js','assets','chunks'].includes(file))) {
     assert.equal(await readFile(`${config.outputDirectory}/${file}`, 'utf8'), await readFile(file, 'utf8'));
   }
   assert.ok((await readFile('dist/public/index.html', 'utf8')).includes('Monetize your audience'));

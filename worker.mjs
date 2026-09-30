@@ -9,6 +9,7 @@ export default {async fetch(request,env={}){
   return handleAudience(request);
  }
  if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405});
+ if(url.pathname.startsWith('/assets/athletes/')&&env.ASSETS)return env.ASSETS.fetch(request);
  const path=url.pathname==='/'?'/index.html':/^\/(athletes|sponsors)\/?$/.test(url.pathname)?'/portal.html':url.pathname;const asset=assets[path];if(!asset)return new Response('Not found',{status:404,headers:{'Content-Type':'text/plain'}});
  return new Response(request.method==='HEAD'?null:asset.body,{headers:{'Content-Type':asset.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
 }};

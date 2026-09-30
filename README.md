@@ -4,7 +4,7 @@ An endurance athlete sponsorship marketplace with a preserved marketing homepage
 
 ## Run
 
-Use Node.js 22. `npm run dev` builds and runs a local server at http://localhost:4174. `npm run build` emits static assets in `dist/public` for Vercel and a self-contained Worker in `dist/server/index.js` for the existing Sites deployment. `npm test` builds both outputs and runs the scraper, API, and deployment tests.
+Use Node.js 22. `npm run dev` builds and runs a local server at http://localhost:4174. `npm run build` emits static assets in `dist/public` for Vercel and a legacy Worker in `dist/server/index.js` (3D assets require a static `ASSETS` binding outside Vercel). `npm test` builds both outputs and runs the scraper, API, and deployment tests.
 
 ## Deploy on Vercel
 
@@ -12,7 +12,7 @@ Use Node.js 22. `npm run dev` builds and runs a local server at http://localhost
 2. Use the repository root as the Root Directory and **Other** as the Framework Preset.
 3. Deploy. `vercel.json` supplies the build command (`npm run build`), output directory (`dist/public`), and a 30-second limit for the Node.js `/api/audience` function. `package.json` selects Node.js 22.
 
-No environment variables or API keys are required for the existing public-profile lookups or the labeled portal demo. Real accounts and shared listings require the Supabase setup in [SETUP.md](SETUP.md). Only browser assets are copied to the public output; server code, tests, and hosting metadata are not served as static files. `/api/audience` uses Vercel's client-IP header and shares its validation and lookup behavior with the Sites Worker. Static assets are revalidated to avoid stale frontend scripts after updates.
+No environment variables or API keys are required for the existing public-profile lookups or the labeled portal demo. Real accounts and shared listings require the Supabase setup in [SETUP.md](SETUP.md). Only browser assets are copied to the public output; server code, tests, and hosting metadata are not served as static files. `/api/audience` uses Vercel's client-IP header and shares its validation and lookup behavior with the Sites Worker. Entry scripts are revalidated after updates; hashed chunks and versioned 3D assets use immutable caching.
 
 The Sites sign-in gate does not transfer to Vercel. Choose Vercel Deployment Protection settings if you want restricted access. The in-memory rate limiter is best-effort per running function instance, not a distributed quota; configure Vercel Firewall or a shared store if stronger public-traffic enforcement is needed.
 
@@ -39,6 +39,8 @@ The price formula remains illustrative: $100–$200 plus $10–$30 per 1,000 com
 The live account/database integration is implemented but needs a dedicated Supabase project and configuration before real users can sign in or share listings. See [SETUP.md](SETUP.md) for the migration, Vercel settings, auth setup, and launch checks. The original homepage brief builder remains a browser-session planning tool.
 
 No payments are processed. Requests reserve a single placement on a single race after athlete approval. Accepted terms are locked; competing requests for the same spot are declined. Final artwork and payment are coordinated directly. Proof is shared by HTTPS link and reviewed by the sponsor.
+
+Avatars use textured 3D geometry with interactive rotation, outfit coverage, and surface-attached sponsor logos. Discovery cards use lightweight generic outfit posters. See [AVATARS.md](AVATARS.md) for the asset pipeline, scalability, and optional personal-scan roadmap.
 
 Avatar choices are optional visual preferences and do not affect pricing. No body image, ethnicity, exact age, height, or weight is required. Social handles are transmitted only when the user requests a lookup.
 

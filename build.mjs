@@ -1,12 +1,14 @@
 import {build} from 'esbuild';
-import {mkdir,readFile,writeFile,copyFile,rm} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,copyFile,rm,cp,readdir} from 'node:fs/promises';
 await mkdir('dist/server',{recursive:true});
 await rm('dist/public',{recursive:true,force:true});
 await mkdir('dist/public',{recursive:true});
-await build({entryPoints:['portal/main.mjs'],outfile:'dist/public/portal.js',bundle:true,format:'esm',target:'es2022',minify:true});
+await build({entryPoints:['portal/main.mjs'],outdir:'dist/public',entryNames:'portal',chunkNames:'chunks/[name]-[hash]',splitting:true,bundle:true,format:'esm',target:'es2022',minify:true});
 const assets={};
 for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};}
 assets['/portal.js']={body:await readFile('dist/public/portal.js','utf8'),type:'text/javascript; charset=utf-8'};
+for(const file of await readdir('dist/public/chunks'))assets['/chunks/'+file]={body:await readFile('dist/public/chunks/'+file,'utf8'),type:'text/javascript; charset=utf-8'};
+await cp('assets/athletes','dist/public/assets/athletes',{recursive:true});
 await writeFile('dist/server/assets.mjs','export const assets='+JSON.stringify(assets)+';\n');
 const portalConfigSource=await readFile('server/portal-config.mjs','utf8');
 const audience=await readFile('audience.mjs','utf8');
