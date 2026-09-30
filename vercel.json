@@ -12,14 +12,30 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     },
     {
-      "source": "/(app.js|style.css|audience.mjs|races.mjs)",
+      "source": "/(app.js|style.css|audience.mjs|races.mjs|portal.js|portal.css)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/athletes",
+      "destination": "/portal.html"
+    },
+    {
+      "source": "/sponsors",
+      "destination": "/portal.html"
     }
   ]
 }

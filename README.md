@@ -1,6 +1,6 @@
 # Athleet
 
-An endurance athlete sponsorship concept with a preserved hero, race timeline, mixed-race package builder, and live social-audience estimator.
+An endurance athlete sponsorship marketplace with a preserved marketing homepage, separate athlete and sponsor portals, outfit-aware placement previews, and a live social-audience estimator.
 
 ## Run
 
@@ -12,7 +12,7 @@ Use Node.js 22. `npm run dev` builds and runs a local server at http://localhost
 2. Use the repository root as the Root Directory and **Other** as the Framework Preset.
 3. Deploy. `vercel.json` supplies the build command (`npm run build`), output directory (`dist/public`), and a 30-second limit for the Node.js `/api/audience` function. `package.json` selects Node.js 22.
 
-No environment variables or API keys are required for the existing public-profile lookups. Only browser assets are copied to the public output; server code, tests, and hosting metadata are not served as static files. `/api/audience` uses Vercel's client-IP header and shares its validation and lookup behavior with the Sites Worker. Static assets are revalidated to avoid stale frontend scripts after updates.
+No environment variables or API keys are required for the existing public-profile lookups or the labeled portal demo. Real accounts and shared listings require the Supabase setup in [SETUP.md](SETUP.md). Only browser assets are copied to the public output; server code, tests, and hosting metadata are not served as static files. `/api/audience` uses Vercel's client-IP header and shares its validation and lookup behavior with the Sites Worker. Static assets are revalidated to avoid stale frontend scripts after updates.
 
 The Sites sign-in gate does not transfer to Vercel. Choose Vercel Deployment Protection settings if you want restricted access. The in-memory rate limiter is best-effort per running function instance, not a distributed quota; configure Vercel Firewall or a shared store if stronger public-traffic enforcement is needed.
 
@@ -30,6 +30,16 @@ Counts come from profile-owned metadata (not suggested accounts), include a sour
 
 The price formula remains illustrative: $100–$200 plus $10–$30 per 1,000 combined followers. Followers across platforms are not deduplicated people. There is no fee display.
 
-The site does not publish listings or take payments. Race details stay in browser memory and the downloadable brief. Social handles are transmitted only when the user requests a lookup.
+## Athlete and sponsor portals
+
+- `/athletes`: profile and avatar customization, social audience checks, upcoming race listings, outfit/placement selection, requests, and proof submission.
+- `/sponsors`: race/location discovery, filters, shortlist, brand/logo placement preview, requests, and proof review.
+- Add `?demo=1` to try either portal with fictional data stored on this device. The two demo roles share that local dataset.
+
+The live account/database integration is implemented but needs a dedicated Supabase project and configuration before real users can sign in or share listings. See [SETUP.md](SETUP.md) for the migration, Vercel settings, auth setup, and launch checks. The original homepage brief builder remains a browser-session planning tool.
+
+No payments are processed. Requests reserve a single placement on a single race after athlete approval. Accepted terms are locked; competing requests for the same spot are declined. Final artwork and payment are coordinated directly. Proof is shared by HTTPS link and reviewed by the sponsor.
+
+Avatar choices are optional visual preferences and do not affect pricing. No body image, ethnicity, exact age, height, or weight is required. Social handles are transmitted only when the user requests a lookup.
 
 Photography: Unsplash, Leona Lee (xGzdmd5lB6I), Miguel Alcântara (nFz4XuVpPD8), Ryan Snaadt (BoCR26LwEcw). No endorsement implied.
