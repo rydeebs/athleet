@@ -1,0 +1,7 @@
+export const brandPlatforms={instagram:{name:'Instagram'},tiktok:{name:'TikTok'},x:{name:'X'},youtube:{name:'YouTube'},threads:{name:'Threads'},facebook:{name:'Facebook'},linkedin:{name:'LinkedIn'}};
+export function websiteUrl(value){const text=String(value||'').trim();if(!text)return '';if(text.length>500||/\s/.test(text))throw new Error('Enter a valid website URL.');let url;try{url=new URL(/^[a-z][a-z\d+.-]*:/i.test(text)?text:'https://'+text);}catch{throw new Error('Enter a valid website URL.');}if(!['https:','http:'].includes(url.protocol)||url.username||url.password||!url.hostname.includes('.'))throw new Error('Use a public http:// or https:// website URL.');if(url.href.length>500)throw new Error('Website links must be under 500 characters.');return url.href;}
+export function normalizeBrandProfile(p){
+ if(!Array.isArray(p.socials||[])||(p.socials||[]).length>7)throw new Error('Add up to seven brand social accounts.');
+ const socials=(p.socials||[]).filter(s=>String(s?.handle||'').trim()).map(s=>{if(!Object.hasOwn(brandPlatforms,s.platform))throw new Error('Choose a supported social platform.');const input=String(s.handle).trim();let handle;if(/^https?:\/\//i.test(input)||/^www\./i.test(input))handle=websiteUrl(input);else{handle=input.replace(/^@/,'');if(!/^[a-z\d_.-]{1,100}$/i.test(handle))throw new Error('Enter an @username or full social page URL.');}return {platform:s.platform,handle};});
+ return {...p,website:websiteUrl(p.website),socials};
+}

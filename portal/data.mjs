@@ -1,3 +1,4 @@
+import {normalizeBrandProfile} from './brand.mjs';
 import {createClient} from '@supabase/supabase-js';
 import {demoData} from './demo.mjs';
 import {validateRace,safeProofUrl,defaultProfile,normalizeAvatar} from './model.mjs';
@@ -27,7 +28,7 @@ export class PortalData {
  persist(){localStorage.setItem(DEMO_KEY,JSON.stringify(this.db));}
  async rpc(name,p){const {data,error}=await this.client.rpc(name,{p});if(error)throw new Error(error.message);return data;}
  async saveProfile(p){
-  if(this.role!=='athlete'){if(!this.demo)return this.rpc('save_brand_profile',p);const i=this.db.profiles.findIndex(r=>r.id===this.user.id);const before=this.db.profiles[i];this.db.profiles[i]={...p,id:this.user.id};try{this.persist();}catch(e){this.db.profiles[i]=before;throw e;}return;}
+  if(this.role!=='athlete'){p=normalizeBrandProfile(p);if(!this.demo)return this.rpc('save_brand_profile',p);const i=this.db.profiles.findIndex(r=>r.id===this.user.id);const before=this.db.profiles[i];if(i<0)this.db.profiles.push({...p,id:this.user.id});else this.db.profiles[i]={...p,id:this.user.id};try{this.persist();}catch(e){if(i<0)this.db.profiles.pop();else this.db.profiles[i]=before;throw e;}return;}
   validateMeasurements(p);validatePerformances(p.performances||[],{pending:true});
   const next={...p,height_cm:p.height_cm==null||p.height_cm===''?null:Number(p.height_cm),weight_kg:p.weight_kg==null||p.weight_kg===''?null:Number(p.weight_kg),performances:[]},uploaded=[];
   try{

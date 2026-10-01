@@ -4,7 +4,7 @@ The portal UI, Supabase integration, and database migration are implemented. A S
 
 ## 1. Create the database
 
-Create a dedicated Supabase project for Athleet in the intended organization. In that project's SQL Editor, run `supabase/migrations/202609300001_portals.sql`, `supabase/migrations/202609300002_performance.sql`, and `supabase/migrations/202610010001_placements_artwork.sql`, once each in that order. Skip migrations already applied. Alternatively, link the checkout to that project and use `supabase db push`.
+Create a dedicated Supabase project for Athleet in the intended organization. In that project's SQL Editor, run `supabase/migrations/202609300001_portals.sql`, `supabase/migrations/202609300002_performance.sql`, `supabase/migrations/202610010001_placements_artwork.sql`, and `supabase/migrations/202610010002_brand_links.sql`, once each in that order. Skip migrations already applied. Alternatively, link the checkout to that project and use `supabase db push`.
 
 The migration creates separate athlete and brand profiles, race listings, private sponsorship requests, and shortlists. All tables have row-level security enabled and no direct anonymous/authenticated table privileges. Narrow database functions enforce ownership, allowed transitions, price snapshots, and exclusive placement reservations. A public snapshot exposes published upcoming listings; private request bodies and proof links are restricted to the two parties.
 
@@ -60,7 +60,7 @@ Local checks already cover the database functions using an isolated PostgreSQL i
 ## Checks
 
 - `npm test`: build, deployment/API checks, audience parsers, portal validation, discovery, and safe configuration.
-- `npm run test:database`: installs nothing; uses existing local PostgreSQL binaries to create a disposable database, stub Supabase identity, apply all three migrations (with a Storage schema stub), and exercise permissions and booking transitions. The temporary database is removed afterward.
+- `npm run test:database`: installs nothing; uses existing local PostgreSQL binaries to create a disposable database, stub Supabase identity, apply all four migrations (with a Storage schema stub), and exercise permissions and booking transitions. The temporary database is removed afterward.
 
 The demo (`?demo=1`) works with or without Supabase. Its fictional records and actions stay in browser local storage, separate from production data. Switching portals lets you act as the demo athlete Alex Rivera or Example Run Co. The other sample athletes illustrate discovery; use Alex's races to try both sides of a request.
 
@@ -83,3 +83,8 @@ The third migration expands placements and creates the private `brand-artwork` P
 Referenced artwork cannot be overwritten or deleted. Failed requests attempt to delete newly uploaded artwork; include unreferenced artwork in the Storage API retention job. Test hosted uploads, signed URLs and both account roles before launch; local PostgreSQL tests use a Storage schema stub. Demo logos persist only in this origin’s IndexedDB.
 
 The sci-fi arena is lightweight procedural Three.js geometry with no external downloads. All legacy scene choices normalize to sci-fi; the environment selector is removed. Moving lights render at up to 30 fps only while the viewer is visible, respect reduced-motion preferences and have a pause control. Existing race placement IDs are retained for compatibility; new listings offer gender-aware chest options. Confirmed listing terms remain locked.
+
+
+## Brand website and social profiles
+
+The fourth migration adds an optional website and up to seven social accounts to brand profiles. Accounts accept usernames or HTTP(S) page URLs for Instagram, TikTok, X, YouTube, Threads, Facebook and LinkedIn. Browser and database validation reject unsafe URL schemes and unsupported account types. These fields persist in the brand owner’s profile; they do not trigger follower lookups or change athlete social accounts. Demo values remain device-local. Apply `202610010002_brand_links.sql` before using these fields with live accounts.
