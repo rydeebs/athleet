@@ -1,4 +1,4 @@
-const photos={gym:'https://images.unsplash.com/photo-1743993414654-0be2b73a9620?auto=format&fit=crop&w=1200&q=85',run:'https://images.unsplash.com/photo-1771166446975-2e9e9a9cd3d0?auto=format&fit=crop&w=800&q=85',track:'https://images.unsplash.com/photo-1605822218374-7222c044e434?auto=format&fit=crop&w=800&q=85'};
+const photos={gym:'https://images.unsplash.com/photo-1743993414654-0be2b73a9620?auto=format&fit=crop&w=1200&q=85',run:'https://images.unsplash.com/photo-1771166446975-2e9e9a9cd3d0?auto=format&fit=crop&w=800&q=85'};
 for(const image of document.querySelectorAll('[data-photo]')){if(photos[image.dataset.photo])image.src=photos[image.dataset.photo];}
 const menu=document.querySelector('.menu-toggle');const nav=document.querySelector('nav');menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('open',open);});nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{nav.classList.remove('open');menu.setAttribute('aria-expanded','false');}));
 import {platforms, normalizeHandle, estimateAudience, lookupXInBrowser} from './audience.mjs';
