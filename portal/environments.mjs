@@ -1,23 +1,33 @@
 import * as T from 'three';
-export function environmentScene(name){
- const group=new T.Group(),materials=[],geometries=[];
- const mat=(color,emissive=false)=>{const m=emissive?new T.MeshBasicMaterial({color}):new T.MeshStandardMaterial({color,roughness:.9});materials.push(m);return m;};
- const mesh=(geometry,material,x,y,z)=>{geometries.push(geometry);const m=new T.Mesh(geometry,material);m.position.set(x,y,z);group.add(m);return m;};
- const plane=(color,size=24)=>{const p=mesh(new T.PlaneGeometry(size,size),mat(color),0,-.012,0);p.rotation.x=-Math.PI/2;p.receiveShadow=true;return p;};
- let background=null,fog=null;
- if(name==='scifi'){
-  background=new T.Color('#071424');fog=new T.Fog('#071424',5,16);plane('#101b2a');const cyan=mat('#43d3f3',true),dark=mat('#14263b');
-  const platform=mesh(new T.CylinderGeometry(.65,.70,.05,64),dark,0,-.026,0);platform.receiveShadow=true;
-  for(const radius of [.69,.78]){const ring=mesh(new T.TorusGeometry(radius,.006,6,80),cyan,0,.005,0);ring.rotation.x=Math.PI/2;}
-  for(let i=0;i<7;i++){const z=-1.2-i*1.4;for(const x of [-1.6,1.6]){mesh(new T.BoxGeometry(.11,2.7,.11),dark,x,1.34,z);mesh(new T.BoxGeometry(.014,2.6,.014),cyan,x-.07,1.3,z);}mesh(new T.BoxGeometry(3.2,.012,.012),cyan,0,2.6,z);}
-  const grid=new T.GridHelper(20,40,0x244c64,0x142c43);grid.position.y=-.008;group.add(grid);geometries.push(grid.geometry);materials.push(grid.material);
- }else if(name==='beach'){
-  background=new T.Color('#bde8f3');fog=new T.Fog('#bde8f3',9,28);plane('#ead8b1');const ocean=mesh(new T.PlaneGeometry(45,25),mat('#43a7b2'),0,-.006,-14);ocean.rotation.x=-Math.PI/2;
-  const trunk=mat('#866947'),leaves=mat('#3c7960');for(const [x,z] of [[-2,-2.5],[2.4,-4]]){mesh(new T.CylinderGeometry(.045,.075,2.7,9),trunk,x,1.33,z);for(let j=0;j<7;j++){const a=j/7*Math.PI*2,p=mesh(new T.SphereGeometry(1,12,6),leaves,x+Math.cos(a)*.4,2.62,z+Math.sin(a)*.4);p.scale.set(.62,.035,.14);p.rotation.y=-a;p.rotation.z=.2;}}
- }else if(name==='city'){
-  background=new T.Color('#c0cddd');fog=new T.Fog('#c0cddd',10,28);plane('#889292');const building=mat('#566875'),window=mat('#d2e6df',true);for(let i=0;i<14;i++){const x=(i%7-3)*1.65,z=-4-Math.floor(i/7)*3,h=1.2+((i*7)%9)*.25;mesh(new T.BoxGeometry(1,h,.9),building,x,h/2,z);for(let y=.35;y<h-.1;y+=.5)mesh(new T.BoxGeometry(.72,.10,.015),window,x,y,z+.46);}const railing=mat('#364854');for(const x of [-2,2])mesh(new T.BoxGeometry(.04,.8,5),railing,x,.4,-1.5);
- }else if(name==='landscape'){
-  background=new T.Color('#d6e6da');fog=new T.Fog('#d6e6da',7,28);plane('#789575');const mountain=mat('#677d80'),snow=mat('#e5ece5'),trees=mat('#31584b');for(let i=0;i<9;i++){const x=(i-4)*2,h=2.3+(i%3)*.7;mesh(new T.ConeGeometry(2,h,7),mountain,x,h/2,-7-(i%2)*3);mesh(new T.ConeGeometry(.5,h*.25,7),snow,x,h*.88,-7-(i%2)*3);}for(let i=0;i<12;i++){const x=(i%2?1:-1)*(1.8+(i%5)*.6),z=-1-i*.55;mesh(new T.ConeGeometry(.24,.95,9),trees,x,.47,z);}
+// One shared arena, with moving emissive geometry instead of expensive bloom.
+export function environmentScene(){
+ const group=new T.Group(),materials=new Set(),geometries=new Set(),runners=[],arcs=[];
+ const mat=(color,glow=false,opacity=1)=>{const m=glow?new T.MeshBasicMaterial({color,transparent:opacity<1,opacity,depthWrite:opacity===1,blending:opacity<1?T.AdditiveBlending:T.NormalBlending}):new T.MeshStandardMaterial({color,roughness:.72,metalness:.25});materials.add(m);return m;};
+ const mesh=(geometry,material,x,y,z)=>{geometries.add(geometry);const m=new T.Mesh(geometry,material);m.position.set(x,y,z);group.add(m);return m;};
+ const palette=['#26e4ff','#b86cff','#ff5ea8','#ffd174'],neon=palette.map(c=>mat(c,true)),dark=mat('#122239');
+ const floor=mesh(new T.PlaneGeometry(26,26),mat('#091526'),0,-.012,0);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;
+ const platform=mesh(new T.CylinderGeometry(.68,.74,.05,64),dark,0,-.026,0);platform.receiveShadow=true;
+ for(let i=0;i<3;i++){const ring=mesh(new T.TorusGeometry(.72+i*.11,.006,6,96),neon[i],0,.008,0);ring.rotation.x=-Math.PI/2;}
+ for(let i=0;i<3;i++){const arc=mesh(new T.TorusGeometry(.77+i*.11,.017,6,64,Math.PI*.55),neon[(i+1)%4],0,.012+i*.002,0);arc.rotation.x=-Math.PI/2;arcs.push(arc);}
+ for(let i=0;i<8;i++){
+  const z=-1.25-i*1.4,color=neon[i%3];
+  for(const side of [-1,1]){
+   mesh(new T.BoxGeometry(.12,2.8,.12),dark,side*1.65,1.39,z);
+   mesh(new T.BoxGeometry(.016,2.7,.018),color,side*1.58,1.35,z+.07);
+   const halo=mesh(new T.PlaneGeometry(.10,2.7),mat(palette[i%3],true,.13),side*1.58,1.35,z+.085);halo.renderOrder=1;
+   const pulse=mesh(new T.BoxGeometry(.035,.30,.032),neon[(i+1)%4],side*1.58,1,z+.09);runners.push({mesh:pulse,phase:i*.7+(side+1)*.9,vertical:true});
+  }
+  mesh(new T.BoxGeometry(3.18,.018,.018),color,0,2.7,z+.07);
  }
- return {group,background,fog,dispose(){for(const g of new Set(geometries))g.dispose();for(const m of new Set(materials.flat()))m.dispose();}};
+ for(const side of [-1,1]){
+  mesh(new T.BoxGeometry(.018,.015,13),neon[side<0?0:2],side*1.2,.004,-5);
+  const runner=mesh(new T.BoxGeometry(.06,.025,.8),neon[side<0?3:1],side*1.2,.017,-3);runners.push({mesh:runner,phase:side,vertical:false});
+ }
+ const grid=new T.GridHelper(24,48,0x244e76,0x172b4d);grid.position.y=-.008;group.add(grid);geometries.add(grid.geometry);for(const m of [grid.material].flat())materials.add(m);
+ const cyan=new T.PointLight(0x28cfff,1.5,5,2),pink=new T.PointLight(0xef56bd,1.2,5,2);cyan.position.set(-1.2,1.5,-.8);pink.position.set(1.2,1.8,-1);group.add(cyan,pink);
+ return {group,background:new T.Color('#060d22'),fog:new T.Fog('#060d22',6,18),update(seconds){
+  arcs.forEach((arc,i)=>{arc.rotation.z=seconds*(i%2?-.24:.2)+i*2;});
+  for(const r of runners){if(r.vertical)r.mesh.position.y=.2+((seconds*.28+r.phase)%2.4);else r.mesh.position.z=1-((seconds*1.1+r.phase+20)%12);}
+  cyan.position.z=-.8+Math.sin(seconds*.4)*.45;pink.position.y=1.6+Math.sin(seconds*.35)*.35;
+ },dispose(){for(const g of geometries)g.dispose();for(const m of materials)m.dispose();}};
 }

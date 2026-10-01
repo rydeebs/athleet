@@ -19,3 +19,11 @@ test('live saves upload evidence separately, send only paths, and remove failed 
  service.rpc=async()=>{throw new Error('save failed');};await assert.rejects(()=>service.saveProfile(p),/save failed/);assert.equal(removed.length,1);assert.equal(removed[0],uploads[1].path);
  service.rpc=async()=>{};await service.saveProfile({...p,performances:[]});assert.ok(removed.includes(uploads[0].path),'removed results release old evidence after save');
 });
+
+test('feet and inches convert to canonical height and round-trip across units',async()=>{
+ const {imperialHeight,heightCentimeters}=await import('../portal/performance.mjs');
+ assert.equal(heightCentimeters('5','11'),180.34);assert.deepEqual(imperialHeight(180.34),{feet:5,inches:11});
+ assert.deepEqual(imperialHeight(182.88),{feet:6,inches:0});assert.equal(heightCentimeters('6',''),182.88);
+ assert.deepEqual(imperialHeight(182.8),{feet:6,inches:0});assert.equal(heightCentimeters('',''),null);assert.deepEqual(imperialHeight(null),{feet:'',inches:''});
+ assert.equal(heightCentimeters('5','10.5'),179.07);
+});

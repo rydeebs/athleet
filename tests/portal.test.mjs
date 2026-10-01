@@ -60,5 +60,5 @@ test('gender-aware placements, outfit coverage and scene preferences stay consis
  for(const z of ['left-shoulder','right-forearm','left-calf','right-thigh','butt'])assert.ok(male.includes(z)&&female.includes(z));
  assert.equal(placementInfo('cleavage','sports-bra').material,'skin');assert.equal(placementInfo('left-forearm','tee').material,'skin');assert.equal(placementInfo('left-calf','wetsuit').material,'kit');
  for(const environment of Object.keys(scenes))assert.equal(normalizeAvatar({environment}).environment,environment);
- assert.equal(normalizeAvatar({environment:'<script>'}).environment,'studio');
+ for(const environment of ['studio','beach','city','landscape','<script>'])assert.equal(normalizeAvatar({environment}).environment,'scifi');
 });

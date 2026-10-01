@@ -19,7 +19,7 @@ import {garments,anchors,findPlacementHit} from './avatar-layout.mjs';
 export class AvatarViewer{
  constructor(){
   this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(32,1,.05,30);this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
-  this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;
+  this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;this.renderer.shadowMap.autoUpdate=false;
   this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','Rotate athlete with arrow keys. Plus and minus zoom.');
   this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=true;this.controls.minDistance=.35;this.controls.maxDistance=4.8;this.controls.minPolarAngle=.65;this.controls.maxPolarAngle=2.05;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
   this.scene.add(new THREE.HemisphereLight(0xfff6e8,0x63756a,.95));
@@ -28,13 +28,18 @@ export class AvatarViewer{
   this.ray=new THREE.Raycaster();this.resizeObserver=new ResizeObserver(()=>this.resize());this.version=0;
   this.onKey=e=>{const c={ArrowLeft:'left',ArrowRight:'right','+':'in','=':'in','-':'out',Home:'reset'}[e.key];if(c){e.preventDefault();this.control(c);}};this.canvas.addEventListener('keydown',this.onKey);
   this.onClick=e=>{const b=e.target.closest('[data-model-control]');if(b)this.control(b.dataset.modelControl);};
-  this.onContextLost=e=>{e.preventDefault();this.fail('3D paused by your browser. Reload to restore it; the placement list still works.');};this.canvas.addEventListener('webglcontextlost',this.onContextLost);
+  this.onContextLost=e=>{e.preventDefault();this.lightsPaused=true;this.syncMotion();this.fail('3D paused by your browser. Reload to restore it; the placement list still works.');};this.canvas.addEventListener('webglcontextlost',this.onContextLost);
+  this.motionPreference=matchMedia('(prefers-reduced-motion: reduce)');this.lightsPaused=this.motionPreference.matches;this.inView=false;this.motionTime=0;
+  this.onMotionPreference=()=>{this.lightsPaused=this.motionPreference.matches;this.syncMotion();};this.motionPreference.addEventListener('change',this.onMotionPreference);
+  this.onVisibility=()=>this.syncMotion();document.addEventListener('visibilitychange',this.onVisibility);
+  this.motionObserver=new IntersectionObserver(entries=>{this.inView=entries.at(-1)?.isIntersecting;this.syncMotion();});
+  this.animate=time=>{this.animationFrame=null;if(this.disposed||this.lightsPaused||!this.inView||document.hidden)return;if(!this.lastFrame||time-this.lastFrame>=32){this.motionTime+=this.lastFrame?Math.min((time-this.lastFrame)/1000,.1):0;this.lastFrame=time;this.environment?.update(this.motionTime);this.draw();}this.animationFrame=requestAnimationFrame(this.animate);};
  }
  async mount(stage,config){
   const version=++this.version,old=this.config;this.config=config;
-  if(this.stage!==stage){this.stage?.removeEventListener('click',this.onClick);this.resizeObserver.disconnect();this.stage=stage;stage.querySelector('.model-viewport').append(this.canvas);stage.addEventListener('click',this.onClick);this.resizeObserver.observe(stage);}
-  if(this.environmentName!==config.environment){if(this.environment){this.scene.remove(this.environment.group);this.environment.dispose();}this.environment=environmentScene(config.environment);this.environmentName=config.environment;this.scene.add(this.environment.group);this.scene.background=this.environment.background;this.scene.fog=this.environment.fog;this.floor.visible=config.environment==='studio';}
-  if(!old||old.view!==config.view||old.viewKey!==config.viewKey||old.closeup!==config.closeup)this.reset();this.resize();
+  if(this.stage!==stage){this.stage?.removeEventListener('click',this.onClick);this.resizeObserver.disconnect();this.stage=stage;stage.querySelector('.model-viewport').append(this.canvas);stage.addEventListener('click',this.onClick);this.resizeObserver.observe(stage);this.motionObserver.disconnect();this.motionObserver.observe(stage);}
+  if(this.environmentName!==config.environment){if(this.environment){this.scene.remove(this.environment.group);this.environment.dispose();}this.environment=environmentScene(config.environment);this.environmentName=config.environment;this.environment.update(this.motionTime);this.scene.add(this.environment.group);this.scene.background=this.environment.background;this.scene.fog=this.environment.fog;this.floor.visible=false;}
+  this.syncMotion();if(!old||old.view!==config.view||old.viewKey!==config.viewKey||old.closeup!==config.closeup)this.reset();this.resize();
   try{
    const a=config.avatar,sex=a.presentation==='feminine'?'female':'male',tone=skins.indexOf(a.skin),hair=a.presentation==='feminine'?'ponytail01':'short02';
    const [asset,skin,hairMap,eyeMap,shoeMap]=await Promise.all([model(a.presentation),texture(`skin-${sex}-${!config.face&&tone>=3?'dark':'light'}.jpg`),texture('hair-'+hair+'.webp'),texture('eyes.jpg'),texture('shoes.jpg')]);
@@ -54,7 +59,7 @@ export class AvatarViewer{
     m.needsUpdate=true;if(o.visible&&!['Hair','Eyes','Shoes'].includes(name))this.surfaces.push(o);
    });
    this.body.updateMatrixWorld(true);if(this.anatomyKey!==anatomyKey){this.sculpted=new Map();this.body.traverse(o=>{if(o.isMesh&&!['Hair','Eyes','Shoes'].includes(o.name)){this.sculpted.set(o,o.geometry);o.geometry=athleticGeometry(o,a);}});this.anatomyKey=anatomyKey;}if(config.faceDetails?.skin)this.matchSkin(skin,config.faceDetails.skin);const anchorKey=anatomyKey+'|'+config.outfit;if(this.anchorKey!==anchorKey){this.findAnchors();this.anchorKey=anchorKey;}await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
-   stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.draw();
+   stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.renderer.shadowMap.needsUpdate=true;this.draw();
   }catch(error){if(version===this.version)this.fail('3D unavailable. Outfit preview shown; use the placement list below.');throw error;}
  }
  matchSkin(base,color){
@@ -111,7 +116,8 @@ export class AvatarViewer{
  restoreAnatomy(){for(const [mesh,original] of this.sculpted||[]){mesh.geometry.dispose();mesh.geometry=original;}this.sculpted=null;this.anatomyKey='';}
  clearModel(){this.anchorKey='';this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();this.restoreAnatomy();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
  reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
- control(action){if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
+ syncMotion(){if(this.animationFrame!=null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;this.lastFrame=0;const button=this.stage?.querySelector('[data-model-control=motion]');if(button){button.textContent=this.lightsPaused?'Play lights':'Pause lights';button.setAttribute('aria-label',this.lightsPaused?'Play background lights':'Pause background lights');}if(!this.disposed&&!this.lightsPaused&&this.inView&&!document.hidden)this.animationFrame=requestAnimationFrame(this.animate);}
+ control(action){if(action==='motion'){this.lightsPaused=!this.lightsPaused;this.syncMotion();return;}if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
  resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.draw();}
  draw(){if(this.disposed||!this.stage)return;this.renderer.render(this.scene,this.camera);const viewport=this.stage.querySelector('.model-viewport'),w=viewport.clientWidth,h=viewport.clientHeight;
   for(const button of this.stage.querySelectorAll('.body-hotspot')){const p=this.points?.[button.dataset.zone];if(!p){button.hidden=true;continue;}const facing=p.normal.dot(this.camera.position.clone().sub(p.point).normalize())>.15;const projected=p.point.clone().project(this.camera);
@@ -121,5 +127,5 @@ export class AvatarViewer{
   }
  }
  fail(message){if(!this.stage)return;this.stage.classList.remove('model-ready');this.stage.classList.add('model-fallback');this.stage.querySelector('.model-status').textContent=message;}
- dispose(){this.disposed=true;this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.environment?.dispose();this.scene.traverse(o=>{if(o.isLight)o.shadow?.dispose();});this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
+ dispose(){this.disposed=true;this.syncMotion();this.motionObserver.disconnect();this.motionPreference.removeEventListener('change',this.onMotionPreference);document.removeEventListener('visibilitychange',this.onVisibility);this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.environment?.dispose();this.scene.traverse(o=>{if(o.isLight)o.shadow?.dispose();});this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
 }

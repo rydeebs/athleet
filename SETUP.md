@@ -49,7 +49,7 @@ Local checks already cover the database functions using an isolated PostgreSQL i
 ## Current scope
 
 - Textured 3D avatars with a private, optional three-photo likeness preview; no personal body scan required.
-- Seven outfit presets, gender-aware anatomical placements, five scene backgrounds, and race-phase visibility notes.
+- Seven outfit presets, gender-aware anatomical placements, an animated sci-fi arena, and race-phase visibility notes.
 - Per-race placement packages with follower-based starting price suggestions and athlete-set prices. No platform fee display.
 - Sponsor filters for event/athlete, race location, discipline, distance, date range, price, followers, and skin/kit placements.
 - Approval, reservation, private campaign/contact details, downloadable briefs, and proof review.
@@ -67,7 +67,7 @@ The demo (`?demo=1`) works with or without Supabase. Its fictional records and a
 
 ## Past race results and photo evidence
 
-The second migration adds optional height (cm), weight (kg) and structured past results to athlete profiles. Metric/imperial inputs convert to canonical cm/kg; they do not alter avatar geometry. A result includes event, year, location, discipline, format, placing, ranking category, optional category/field size/time, and one required evidence image. Both browser and database enforce limits and evidence ownership. Uploaded evidence is supporting material, not an independently verified placing.
+The second migration adds optional height (cm), weight (kg) and structured past results to athlete profiles. Metric and feet/inches inputs convert to canonical cm/kg; they do not alter avatar geometry. A result includes event, year, location, discipline, format, placing, ranking category, optional category/field size/time, and one required evidence image. Both browser and database enforce limits and evidence ownership. Uploaded evidence is supporting material, not an independently verified placing.
 
 The UI decodes JPG/PNG/WebP inputs up to 8 MB, resizes them to at most 1600 pixels on the long edge, and re-encodes JPEG (removing original metadata) at up to 2 MB. Uploads occur when **Save profile** is selected. The private `performance-evidence` bucket allows owner uploads, owner reads, and signed-in brands to read evidence attached to a currently published upcoming listing. Five-minute signed URLs are generated on demand. No overwrite policy exists; attached evidence cannot be deleted until it is removed from the profile. Failed saves attempt to remove newly uploaded objects. Successful saves also attempt to remove superseded or removed evidence. Failed cleanup may leave private, unattached objects; configure a retention job using the Storage API before production scale. Never delete `storage.objects` rows directly to remove files.
 
@@ -82,4 +82,4 @@ The third migration expands placements and creates the private `brand-artwork` P
 
 Referenced artwork cannot be overwritten or deleted. Failed requests attempt to delete newly uploaded artwork; include unreferenced artwork in the Storage API retention job. Test hosted uploads, signed URLs and both account roles before launch; local PostgreSQL tests use a Storage schema stub. Demo logos persist only in this origin’s IndexedDB.
 
-Scenes are lightweight procedural Three.js geometry with no external downloads or continuous animation. Profile environment is saved; scene changes in request/race previews are temporary viewing preferences. Existing race placement IDs are retained for compatibility; new listings offer gender-aware chest options. Confirmed listing terms remain locked.
+The sci-fi arena is lightweight procedural Three.js geometry with no external downloads. All legacy scene choices normalize to sci-fi; the environment selector is removed. Moving lights render at up to 30 fps only while the viewer is visible, respect reduced-motion preferences and have a pause control. Existing race placement IDs are retained for compatibility; new listings offer gender-aware chest options. Confirmed listing terms remain locked.
