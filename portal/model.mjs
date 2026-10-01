@@ -13,7 +13,7 @@ export const zones = ['chest','back','left-arm','right-arm','left-thigh','right-
 export const skins = ['#f0cbb2','#d6a17c','#b77d55','#905b3b','#69432f','#422c24'];
 export const kitColors = ['#283e34','#24282c','#54697c','#854b40','#c8cdbe'];
 export const defaultAvatar = {skin:skins[2],build:'athletic',presentation:'masculine',gender:'male',outfit:'singlet',kit:kitColors[0]};
-export const defaultProfile = {display_name:'',location:'',bio:'',avatar:defaultAvatar,socials:[],audience:null};
+export const defaultProfile = {display_name:'',location:'',bio:'',avatar:defaultAvatar,socials:[],audience:null,height_cm:null,weight_kg:null,performances:[]};
 export const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n || 0);
 export const count = n => new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(n || 0);
 export const dateLabel = value => value ? new Date(value+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'Date to confirm';

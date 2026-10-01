@@ -1,6 +1,8 @@
 import {createClient} from '@supabase/supabase-js';
 import {demoData} from './demo.mjs';
 import {validateRace,safeProofUrl,defaultProfile,normalizeAvatar} from './model.mjs';
+import {validateMeasurements,validatePerformances} from './performance.mjs';
+import {demoEvidence} from './evidence.mjs';
 const DEMO_KEY='athleet.portal.demo.v1';
 export class PortalData {
  constructor(){this.demo=new URLSearchParams(location.search).get('demo')==='1';this.role=location.pathname.startsWith('/sponsors')?'sponsor':'athlete';}
@@ -15,13 +17,26 @@ export class PortalData {
  }
  async snapshot(){
   if(!this.demo){if(!this.client)return {profile:null,listings:[],bookings:[],shortlist:[]};const {data,error}=await this.client.rpc('portal_snapshot');if(error)throw new Error('Could not load the marketplace. Check the database setup or try again.');if(this.role==='sponsor')data.profile=data.brand_profile;
-  if(data.profile)data.profile={...defaultProfile,...data.profile,avatar:normalizeAvatar(data.profile.avatar)};return data;}
+  this.evidencePaths=(data.profile?.performances||[]).map(r=>r.evidence_path);if(data.profile)data.profile={...defaultProfile,...data.profile,avatar:normalizeAvatar(data.profile.avatar)};return data;}
+  this.evidencePaths=(this.db.profiles.find(p=>p.id===this.user.id)?.performances||[]).map(r=>r.evidence_path);
   const listings=this.db.listings.filter(r=>r.status==='published'||r.athlete_id===this.user.id).map(r=>({...r,profile:this.db.profiles.find(p=>p.id===r.athlete_id),reserved:this.db.bookings.filter(b=>b.listing_id===r.id&&['accepted','submitted','completed'].includes(b.status)).map(b=>b.placement)}));
   return {profile:this.db.profiles.find(p=>p.id===this.user.id),listings,bookings:this.db.bookings.filter(b=>b.sponsor_id===this.user.id||this.db.listings.find(r=>r.id===b.listing_id)?.athlete_id===this.user.id).map(b=>({...b,listing:this.db.listings.find(r=>r.id===b.listing_id)})),shortlist:this.db.shortlist.filter(s=>s.user_id===this.user.id).map(s=>s.listing_id)};
  }
  persist(){localStorage.setItem(DEMO_KEY,JSON.stringify(this.db));}
  async rpc(name,p){const {data,error}=await this.client.rpc(name,{p});if(error)throw new Error(error.message);return data;}
- async saveProfile(p){if(!this.demo)return this.rpc(this.role==='athlete'?'save_portal_profile':'save_brand_profile',p);const i=this.db.profiles.findIndex(r=>r.id===this.user.id);this.db.profiles[i]={...p,id:this.user.id};this.persist();}
+ async saveProfile(p){
+  if(this.role!=='athlete'){if(!this.demo)return this.rpc('save_brand_profile',p);const i=this.db.profiles.findIndex(r=>r.id===this.user.id);const before=this.db.profiles[i];this.db.profiles[i]={...p,id:this.user.id};try{this.persist();}catch(e){this.db.profiles[i]=before;throw e;}return;}
+  validateMeasurements(p);validatePerformances(p.performances||[],{pending:true});
+  const next={...p,height_cm:p.height_cm==null||p.height_cm===''?null:Number(p.height_cm),weight_kg:p.weight_kg==null||p.weight_kg===''?null:Number(p.weight_kg),performances:[]},uploaded=[];
+  try{
+   for(const result of p.performances||[]){const {evidence_file,...r}=result;if(evidence_file){if(evidence_file.type!=='image/jpeg'||evidence_file.size>2*1024*1024)throw new Error('Prepare a valid evidence image first.');r.evidence_path=`${this.user.id}/${crypto.randomUUID()}.jpg`;if(this.demo)await demoEvidence('put',r.evidence_path,evidence_file);else{const {error}=await this.client.storage.from('performance-evidence').upload(r.evidence_path,evidence_file,{contentType:'image/jpeg',upsert:false});if(error)throw new Error('Could not upload evidence. Check your connection and storage setup.');}uploaded.push(r.evidence_path);}if(!r.evidence_path?.startsWith(this.user.id+'/'))throw new Error('Evidence must belong to your account.');next.performances.push(r);}
+   if(this.demo){for(const r of next.performances)if(!await demoEvidence('get',r.evidence_path))throw new Error('Evidence is missing from this device. Replace the image before saving.');const before=this.db.profiles;this.db.profiles=this.db.profiles.filter(r=>r.id!==this.user.id).concat({...next,id:this.user.id});try{this.persist();}catch(e){this.db.profiles=before;throw e;}}
+   else await this.rpc('save_portal_profile',next);
+  }catch(e){await Promise.allSettled(uploaded.map(path=>this.demo?demoEvidence('delete',path):this.client.storage.from('performance-evidence').remove([path])));throw e;}
+  const retained=next.performances.map(r=>r.evidence_path),obsolete=(this.evidencePaths||[]).filter(path=>!retained.includes(path));this.evidencePaths=retained;await Promise.allSettled(obsolete.map(path=>this.demo?demoEvidence('delete',path):this.client.storage.from('performance-evidence').remove([path])));
+  return next;
+ }
+ async evidenceUrl(result){if(result.evidence_file)return URL.createObjectURL(result.evidence_file);if(this.demo){const blob=await demoEvidence('get',result.evidence_path);if(!blob)throw new Error('This evidence image is no longer on this device. Ask the athlete to replace it.');return URL.createObjectURL(blob);}if(!this.user)throw new Error('Sign in as a sponsor to view evidence.');const {data,error}=await this.client.storage.from('performance-evidence').createSignedUrl(result.evidence_path,300);if(error)throw new Error('Could not open evidence. Sign in as a sponsor or try again.');return data.signedUrl;}
  async saveRace(p){validateRace(p);if(!this.demo)return this.rpc('save_race_listing',p);const old=this.db.listings.find(r=>r.id===p.id);if(old&&old.athlete_id!==this.user.id)throw new Error('This listing belongs to another athlete.');if(old&&this.db.bookings.some(b=>b.listing_id===old.id&&['pending','accepted','submitted','completed'].includes(b.status)))throw new Error('Resolve existing requests before changing this listing. Confirmed listings are locked.');const race={...p,id:p.id||crypto.randomUUID(),athlete_id:this.user.id};this.db.listings=old?this.db.listings.map(r=>r.id===old.id?race:r):[race,...this.db.listings];this.persist();return race.id;}
  async shortlist(id,on){if(!this.demo)return this.rpc('set_shortlist',{listing_id:id,on});this.db.shortlist=this.db.shortlist.filter(s=>!(s.user_id===this.user.id&&s.listing_id===id));if(on)this.db.shortlist.push({user_id:this.user.id,listing_id:id});this.persist();}
  async request(p){

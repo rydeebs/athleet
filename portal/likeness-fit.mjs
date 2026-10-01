@@ -1,8 +1,6 @@
 import {clamp} from './photo-color.mjs';
 export const likenessViews=[
  {id:'front',label:'Front',angle:0,hint:'Look straight ahead. Keep both ears visible.'},
- {id:'left45',label:'45° · nose points left',angle:Math.PI/4,hint:'Turn halfway toward the left edge of the photo. Both eyes should remain visible.'},
- {id:'right45',label:'45° · nose points right',angle:-Math.PI/4,hint:'Turn halfway toward the right edge of the photo. Both eyes should remain visible.'},
  {id:'left',label:'Profile · nose points left',angle:Math.PI/2,hint:'A full side view: nose points left and only the near eye is visible.'},
  {id:'right',label:'Profile · nose points right',angle:-Math.PI/2,hint:'A full side view: nose points right and only the near eye is visible.'}
 ];
@@ -11,7 +9,7 @@ export const pointLabels={eyeL:'Eye center · photo left',eyeR:'Eye center · ph
 export function keysFor(view){return Math.abs(view.angle)>1? [view.angle>0?'eyeR':'eyeL','nose','mouth','chin',view.angle>0?'earR':'earL']:view.id==='front'?['eyeL','eyeR','nose','mouth','chin','cheekL','cheekR','mouthL','mouthR']:['eyeL','eyeR','nose','mouth','chin'];}
 export function validatePoints(view,points){const keys=keysFor(view);if(keys.some(k=>!points[k]||points[k].some(v=>!Number.isFinite(v)||v<0||v>1)))throw new Error('Place every alignment point on the photo.');const eye=points[view.angle>1?'eyeR':'eyeL'];if(points.chin[1]-eye[1]<.08)throw new Error('Check the eye and chin points. The chin must be clearly below the eyes.');if(view.angle>1&&points.nose[0]>=eye[0]||view.angle< -1&&points.nose[0]<=eye[0])throw new Error('This profile points the wrong way. Use Flip photo or choose the other profile slot.');}
 export function buildHeadFit(rows){
- for(const view of likenessViews){const row=rows.find(r=>r.id===view.id);if(!row?.confirmed)throw new Error('Review and confirm all five views first.');validatePoints(view,row.points);}
+ for(const view of likenessViews){const row=rows.find(r=>r.id===view.id);if(!row?.confirmed)throw new Error('Review and confirm all three views first.');validatePoints(view,row.points);}
  const front=rows.find(r=>r.id==='front'),p=front.points,eye=[(p.eyeL[0]+p.eyeR[0])/2,(p.eyeL[1]+p.eyeR[1])/2],scale=.11/((p.chin[1]-eye[1])*front.height),controls=[];
  for(const key of keysFor(likenessViews[0])){const a=headAnchors[key];controls.push({key,center:a,delta:[clamp((p[key][0]-eye[0])*front.width*scale-a[0],-.018,.018),clamp(1.635-(p[key][1]-eye[1])*front.height*scale-a[1],-.015,.015),0],radius:key.startsWith('cheek')?.055:.035});}
  for(const key of ['nose','mouth','chin']){const depths=[];for(const id of ['left','right']){const row=rows.find(r=>r.id===id),sign=id==='left'?-1:1,e=row.points[id==='left'?'eyeR':'eyeL'],s=.11/((row.points.chin[1]-e[1])*row.height);depths.push(.13+sign*(row.points[key][0]-e[0])*row.width*s);}controls.find(c=>c.key===key).delta[2]=clamp(depths.reduce((a,b)=>a+b)/depths.length-headAnchors[key][2],-.018,.018);}

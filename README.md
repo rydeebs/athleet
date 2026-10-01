@@ -48,4 +48,6 @@ Avatar choices are optional visual preferences and do not affect pricing. No bod
 
 Photography: Unsplash, Leona Lee (xGzdmd5lB6I), Miguel Alcântara (nFz4XuVpPD8), Ryan Snaadt (BoCR26LwEcw). No endorsement implied.
 
-An optional **Create my likeness · 5 photos** workflow in My profile adds guided front/three-quarter/profile capture, reviewed alignment, bounded head fitting, local color matching and multi-view texture blending. This experimental preview stays private to the current tab; it is not a scan or a published digital twin. See `AVATARS.md`.
+An optional **Create my likeness · 3 photos** workflow in My profile adds guided front/profile capture, reviewed alignment, bounded head fitting, local color matching and multi-view texture blending. This experimental preview stays private to the current tab; it is not a scan or a published digital twin. See `AVATARS.md`.
+
+Athlete profiles also support optional height/weight (metric or imperial entry) and up to 12 past race results with required image evidence. Sponsors see event/year/location, placing and ranking category, optional time/field size, and an evidence viewer. Results are labeled athlete supplied rather than verified. Demo evidence is stored in IndexedDB; live evidence uses the private Supabase bucket introduced in `202609300002_performance.sql`. Apply both migrations before enabling live accounts.
