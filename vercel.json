@@ -19,7 +19,7 @@
       ]
     },
     {
-      "source": "/(app.js|style.css|audience.mjs|races.mjs|portal.js|portal.css)",
+      "source": "/(app.js|style.css|audience.mjs|races.mjs|portal.js|portal.css|sponsor.css|sponsor.js)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -45,6 +45,10 @@
     {
       "source": "/sponsors",
       "destination": "/portal.html"
+    },
+    {
+      "source": "/for-sponsors",
+      "destination": "/sponsor.html"
     }
   ]
 }

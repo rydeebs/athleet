@@ -1,0 +1,8 @@
+const dialog=document.querySelector('#season-dialog');
+for(const link of document.querySelectorAll('.season-action'))link.addEventListener('click',event=>{event.preventDefault();document.querySelector('#season-status').textContent='';dialog.showModal();});
+dialog.querySelector('.close').addEventListener('click',()=>dialog.close());
+dialog.addEventListener('click',event=>{if(event.target!==dialog)return;const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();});
+document.querySelector('#season-form').addEventListener('submit',event=>{
+ event.preventDefault();const data=new FormData(event.target),brief=['ATHLEET / SEASON PARTNERSHIP BRIEF','Planning draft. Not submitted, booked or paid.','',`Brand: ${data.get('brand')}`,`Season: ${data.get('weekends')}`,`Market: ${data.get('market')}`,`Offer and preferred races: ${data.get('offer')}`,'','Core: athlete race-day placement, social posts, timestamped proof pack.','Optional proposed attach: Race-day digital follow, same creative/landing page/code, 14–30 days.','Agree: exact races and athletes, placement rules, category availability, venue audience coverage, measurement, volume price and next-season first refusal.','Digital follow and managed payment release are not currently live.'].join('\n');
+ const url=URL.createObjectURL(new Blob([brief],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download='athleet-season-brief.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);document.querySelector('#season-status').textContent='Brief downloaded. Nothing has been sent; keep it for your partnership conversation.';
+});

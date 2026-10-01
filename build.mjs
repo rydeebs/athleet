@@ -5,7 +5,7 @@ await rm('dist/public',{recursive:true,force:true});
 await mkdir('dist/public',{recursive:true});
 await build({entryPoints:['portal/main.mjs'],outdir:'dist/public',entryNames:'portal',chunkNames:'chunks/[name]-[hash]',splitting:true,bundle:true,format:'esm',target:'es2022',minify:true});
 const assets={};
-for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};}
+for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css','sponsor.html','sponsor.css','sponsor.js']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};}
 assets['/portal.js']={body:await readFile('dist/public/portal.js','utf8'),type:'text/javascript; charset=utf-8'};
 for(const file of await readdir('dist/public/chunks'))assets['/chunks/'+file]={body:await readFile('dist/public/chunks/'+file,'utf8'),type:'text/javascript; charset=utf-8'};
 await cp('assets/vision','dist/public/assets/vision',{recursive:true});

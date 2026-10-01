@@ -18,6 +18,12 @@ The Sites sign-in gate does not transfer to Vercel. Choose Vercel Deployment Pro
 
 After deployment, check `/`, add a mixed-race package, and calculate an audience from a public handle. Social sites can block the Vercel hosting IP just as they can block other hosting providers; successful local tests do not guarantee every profile is readable in production. Instagram remains best-effort, and blocked accounts show an error instead of a fabricated total.
 
+## Sponsor product page
+
+`/for-sponsors` presents the race-weekend package for brand buyers: athlete placement, optional Race-day digital follow, example pricing and a season offer. Homepage sponsor links lead here; `/sponsors` remains the workspace. The page uses illustrative inventory and explicitly labels digital follow, category locks and managed payment release as proposed. None of those services or checkout flows is implemented by this page.
+
+The season CTA currently opens a device-local brief generator, with an explicit notice that enquiries are not connected. Configure a real contact email, booking destination or intake endpoint before treating it as a sales enquiry channel. The generated brief is downloaded only and is never submitted.
+
 ## Race packages
 
 One race, multi-race, and full-season packages support up to 12 events. Road running, trail/ultramarathon, triathlon, HYROX, cycling, and custom endurance events each have distances/formats. Per-event names, dates, locations, participant estimates, and finish bands appear in the brand-facing pass and downloadable brief.

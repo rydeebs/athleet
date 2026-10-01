@@ -19,7 +19,7 @@ Add these variables in the Athleet Vercel project's settings, then redeploy:
 
 Never use a secret or service-role key. The configuration endpoint rejects privileged keys. These values are intentionally browser-readable because access is enforced by authenticated database functions and table privileges, not by hiding the public key.
 
-The existing Vercel build settings still apply: framework **Other**, `npm run build`, output `dist/public`. Routes `/athletes` and `/sponsors` are included in `vercel.json`.
+The existing Vercel build settings still apply: framework **Other**, `npm run build`, output `dist/public`. Routes `/athletes`, `/sponsors` and the public sponsor product page `/for-sponsors` are included in `vercel.json`. The season enquiry CTA on `/for-sponsors` currently downloads a local planning brief; connect a real sales contact or intake destination before launch.
 
 For local work, copy `.env.example` to `.env.local`, fill those two values, and run `npm run dev`. The development server reads `.env.local`; it is ignored by Git. Rebuild with `npm run build` and refresh the browser after frontend edits.
 
