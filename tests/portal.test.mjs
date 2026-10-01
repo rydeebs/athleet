@@ -51,3 +51,14 @@ test('portal routes load directly and server files remain private',async()=>{
  for(const path of ['/server/portal-config.mjs','/supabase/migrations/202609300001_portals.sql','/.env.local','/portal/data.mjs'])assert.equal((await worker.fetch(new Request('https://example.com'+path))).status,404);
  assert.deepEqual(await (await worker.fetch(new Request('https://example.com/api/portal-config'))).json(),{configured:false});
 });
+
+test('gender-aware placements, outfit coverage and scene preferences stay consistent',async()=>{
+ const {availableZones,scenes}=await import('../portal/placements.mjs');
+ const male=availableZones({gender:'male'}),female=availableZones({gender:'female'});
+ assert.ok(male.includes('left-pec')&&male.includes('right-pec')&&!male.includes('cleavage'));
+ assert.ok(female.includes('cleavage')&&!female.some(z=>z.endsWith('-pec')));
+ for(const z of ['left-shoulder','right-forearm','left-calf','right-thigh','butt'])assert.ok(male.includes(z)&&female.includes(z));
+ assert.equal(placementInfo('cleavage','sports-bra').material,'skin');assert.equal(placementInfo('left-forearm','tee').material,'skin');assert.equal(placementInfo('left-calf','wetsuit').material,'kit');
+ for(const environment of Object.keys(scenes))assert.equal(normalizeAvatar({environment}).environment,environment);
+ assert.equal(normalizeAvatar({environment:'<script>'}).environment,'studio');
+});

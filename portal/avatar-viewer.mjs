@@ -1,3 +1,6 @@
+import {environmentScene} from './environments.mjs';
+import {athleticGeometry} from './anatomy.mjs';
+import {placementZones} from './placements.mjs';
 import * as THREE from 'three';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -12,15 +15,15 @@ const modelCache=new Map(),textureCache=new Map();
 const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder),textures=new THREE.TextureLoader();
 function model(name){if(!modelCache.has(name))modelCache.set(name,loader.loadAsync(avatarAssetRoot+name+'.glb').catch(e=>{modelCache.delete(name);throw e;}));return modelCache.get(name);}
 function texture(name){if(!textureCache.has(name))textureCache.set(name,textures.loadAsync(avatarAssetRoot+name).then(t=>{t.colorSpace=THREE.SRGBColorSpace;t.flipY=false;t.anisotropy=4;return t;}).catch(e=>{textureCache.delete(name);throw e;}));return textureCache.get(name);}
-import {garments,anchors} from './avatar-layout.mjs';
+import {garments,anchors,findPlacementHit} from './avatar-layout.mjs';
 export class AvatarViewer{
  constructor(){
   this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(32,1,.05,30);this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
-  this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.12;
+  this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;
   this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','Rotate athlete with arrow keys. Plus and minus zoom.');
   this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=true;this.controls.minDistance=.35;this.controls.maxDistance=4.8;this.controls.minPolarAngle=.65;this.controls.maxPolarAngle=2.05;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
-  this.scene.add(new THREE.HemisphereLight(0xfff6e8,0x63756a,2.4));
-  for(const [pos,color,intensity] of [[[-3,4,4],0xfff4e5,3],[[3,2,2],0xd9eaff,1.6],[[1,3,-3],0xffffff,3]]){const light=new THREE.DirectionalLight(color,intensity);light.position.set(...pos);this.scene.add(light);}
+  this.scene.add(new THREE.HemisphereLight(0xfff6e8,0x63756a,.95));
+  for(const [pos,color,intensity] of [[[-3,4,4],0xfff4e5,3.7],[[3,2,2],0xd9eaff,.8],[[1,3,-3],0xffffff,2]]){const light=new THREE.DirectionalLight(color,intensity);light.position.set(...pos);if(pos[0]===-3){light.castShadow=true;light.shadow.mapSize.set(1024,1024);Object.assign(light.shadow.camera,{left:-1.4,right:1.4,top:2,bottom:-1,near:.1,far:12});light.shadow.bias=-.0005;light.shadow.normalBias=.01;}this.scene.add(light);}
   const floor=new THREE.Mesh(new THREE.CircleGeometry(.5,64),new THREE.MeshBasicMaterial({color:0x63785e,transparent:true,opacity:.1,depthWrite:false}));floor.rotation.x=-Math.PI/2;floor.position.y=-.006;this.scene.add(floor);this.floor=floor;
   this.ray=new THREE.Raycaster();this.resizeObserver=new ResizeObserver(()=>this.resize());this.version=0;
   this.onKey=e=>{const c={ArrowLeft:'left',ArrowRight:'right','+':'in','=':'in','-':'out',Home:'reset'}[e.key];if(c){e.preventDefault();this.control(c);}};this.canvas.addEventListener('keydown',this.onKey);
@@ -30,25 +33,27 @@ export class AvatarViewer{
  async mount(stage,config){
   const version=++this.version,old=this.config;this.config=config;
   if(this.stage!==stage){this.stage?.removeEventListener('click',this.onClick);this.resizeObserver.disconnect();this.stage=stage;stage.querySelector('.model-viewport').append(this.canvas);stage.addEventListener('click',this.onClick);this.resizeObserver.observe(stage);}
+  if(this.environmentName!==config.environment){if(this.environment){this.scene.remove(this.environment.group);this.environment.dispose();}this.environment=environmentScene(config.environment);this.environmentName=config.environment;this.scene.add(this.environment.group);this.scene.background=this.environment.background;this.scene.fog=this.environment.fog;this.floor.visible=config.environment==='studio';}
   if(!old||old.view!==config.view||old.viewKey!==config.viewKey||old.closeup!==config.closeup)this.reset();this.resize();
   try{
    const a=config.avatar,sex=a.presentation==='feminine'?'female':'male',tone=skins.indexOf(a.skin),hair=a.presentation==='feminine'?'ponytail01':'short02';
    const [asset,skin,hairMap,eyeMap,shoeMap]=await Promise.all([model(a.presentation),texture(`skin-${sex}-${!config.face&&tone>=3?'dark':'light'}.jpg`),texture('hair-'+hair+'.webp'),texture('eyes.jpg'),texture('shoes.jpg')]);
    if(version!==this.version||this.disposed)return;
-   if(this.presentation!==a.presentation){this.clearModel();this.body=asset.scene.clone(true);this.body.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.frustumCulled=false;}});this.scene.add(this.body);this.presentation=a.presentation;}
+   if(this.presentation!==a.presentation){this.clearModel();this.body=asset.scene.clone(true);this.body.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.frustumCulled=false;o.castShadow=true;o.receiveShadow=true;}});this.scene.add(this.body);this.presentation=a.presentation;}
+   const anatomyKey=a.presentation+'|'+a.build;if(this.anatomyKey!==anatomyKey){this.clearFace();this.restoreAnatomy();}
    const visible=new Set(['Body','Hair','Eyes','Shoes',...garments[config.outfit]]);
    if(config.face)visible.delete('Hair');
    this.surfaces=[];this.body.traverse(o=>{if(!o.isMesh)return;const name=o.name.split('_')[0].split('.')[0];o.visible=visible.has(name);const m=o.material;
     if(o.morphTargetInfluences){for(const [key,index] of Object.entries(o.morphTargetDictionary))o.morphTargetInfluences[index]=key===a.build?1:0;}
     m.roughness=.58;m.metalness=0;
-    if(name==='Body'){m.map=skin;m.color.set(['#fff5ed','#e5c6a9','#cda581','#fff0dd','#d1b59a','#9a7c64'][tone]||'#ffffff');}
+    if(name==='Body'){m.roughness=.68;m.map=skin;m.color.set(['#fff5ed','#e5c6a9','#cda581','#fff0dd','#d1b59a','#9a7c64'][tone]||'#ffffff');}
     else if(name==='Hair'){m.map=hairMap;m.color.set('#47372a');m.alphaTest=.35;m.transparent=false;m.side=THREE.DoubleSide;m.depthWrite=true;}
     else if(name==='Eyes'){m.map=config.face?null:eyeMap;m.color.set('#ffffff');m.roughness=config.face?.58:.22;}
     else if(name==='Shoes'){m.map=shoeMap;m.color.set('#d9ddd3');}
     else{m.map=null;m.color.set(a.kit);if(['Shorts','Leggings'].includes(name))m.color.multiplyScalar(.82);m.side=THREE.DoubleSide;m.roughness=.9;}
     m.needsUpdate=true;if(o.visible&&!['Hair','Eyes','Shoes'].includes(name))this.surfaces.push(o);
    });
-   this.body.updateMatrixWorld(true);if(config.faceDetails?.skin)this.matchSkin(skin,config.faceDetails.skin);this.findAnchors();await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
+   this.body.updateMatrixWorld(true);if(this.anatomyKey!==anatomyKey){this.sculpted=new Map();this.body.traverse(o=>{if(o.isMesh&&!['Hair','Eyes','Shoes'].includes(o.name)){this.sculpted.set(o,o.geometry);o.geometry=athleticGeometry(o,a);}});this.anatomyKey=anatomyKey;}if(config.faceDetails?.skin)this.matchSkin(skin,config.faceDetails.skin);const anchorKey=anatomyKey+'|'+config.outfit;if(this.anchorKey!==anchorKey){this.findAnchors();this.anchorKey=anchorKey;}await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
    stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.draw();
   }catch(error){if(version===this.version)this.fail('3D unavailable. Outfit preview shown; use the placement list below.');throw error;}
  }
@@ -65,25 +70,27 @@ export class AvatarViewer{
  }
  findAnchors(){
   this.points={};for(const [zone,[x,y,side]] of Object.entries(anchors)){
-   this.ray.set(new THREE.Vector3(x,y,side*2),new THREE.Vector3(0,0,-side));const hit=this.ray.intersectObjects(this.surfaces,false)[0];
+   const hit=findPlacementHit(this.ray,this.surfaces,zone);
    if(hit){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);this.points[zone]={...hit,normal};}
   }
  }
  async updateLogo(version){
-  this.clearLogo();const c=this.config,hit=this.points[c.active];if(!hit||(!c.logo&&!c.brand))return;
-  let map,aspect;
-  if(c.logo){map=await new THREE.TextureLoader().loadAsync(c.logo);map.colorSpace=THREE.SRGBColorSpace;aspect=map.image.width/map.image.height;}
-  else{const canvas=document.createElement('canvas');let ctx=canvas.getContext('2d');ctx.font='700 96px Arial';canvas.width=Math.ceil(ctx.measureText(c.brand).width)+24;canvas.height=128;ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.font='700 96px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(c.brand,canvas.width/2,68);map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;aspect=canvas.width/canvas.height;}
-  if(version!==this.version||this.disposed){map.dispose();return;}
-  const maxWidth=c.active.includes('arm')?.085:c.active.includes('thigh')?.1:.22;const height=Math.min(maxWidth/aspect,.16),width=height*aspect;
-  // Bake the active morph before projecting; DecalGeometry otherwise uses the base pose.
-  const mesh=hit.object,geometry=mesh.geometry.clone(),position=geometry.attributes.position,v=new THREE.Vector3();
-  for(let i=0;i<position.count;i++){mesh.getVertexPosition(i,v);position.setXYZ(i,v.x,v.y,v.z);}geometry.morphAttributes={};geometry.computeVertexNormals();
-  const surface=new THREE.Mesh(geometry);surface.matrixWorld.copy(mesh.matrixWorld);
-  const orientation=new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,0,1),hit.normal));
-  const decalGeometry=new DecalGeometry(surface,hit.point,orientation,new THREE.Vector3(width,height,.10));geometry.dispose();
-  const material=new THREE.MeshStandardMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.85});
-  this.decal=new THREE.Mesh(decalGeometry,material);this.decal.renderOrder=5;this.scene.add(this.decal);
+  this.clearLogo();const c=this.config,marks=new Map();
+  if(c.showSlots)for(const zone of c.available||c.selected||[])if(!c.reserved.includes(zone))marks.set(zone,{zone,brand:'AVAILABLE',placeholder:true});
+  for(const mark of c.marks||[])marks.set(mark.zone,mark);
+  if(c.active&&(c.logo||c.brand))marks.set(c.active,{zone:c.active,logo:c.logo,brand:c.brand});
+  this.decals=[];
+  for(const mark of marks.values()){
+   const hit=this.points[mark.zone];if(!hit)continue;let map,aspect;
+   if(mark.logo){try{map=await textures.loadAsync(mark.logo);map.colorSpace=THREE.SRGBColorSpace;aspect=map.image.width/map.image.height;}catch{map=null;}}
+   if(!map){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d');if(mark.placeholder){ctx.fillStyle='#deefabbb';ctx.fillRect(8,8,496,240);ctx.strokeStyle='#536546';ctx.lineWidth=8;ctx.strokeRect(8,8,496,240);}if(!mark.placeholder){ctx.fillStyle='#f8faf0';ctx.fillRect(8,8,496,240);}ctx.fillStyle='#21392b';ctx.font=mark.placeholder?'700 64px Arial':'700 140px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((mark.brand||'SPONSOR').slice(0,24),256,132,480);map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;aspect=2;}
+   if(version!==this.version||this.disposed){map.dispose();return;}
+   const maxWidth=placementZones[mark.zone]?.width||.1,height=Math.min(maxWidth/aspect,.12),width=height*aspect;
+   const mesh=hit.object,geometry=mesh.geometry.clone(),position=geometry.attributes.position,v=new THREE.Vector3();for(let i=0;i<position.count;i++){mesh.getVertexPosition(i,v);position.setXYZ(i,v.x,v.y,v.z);}geometry.morphAttributes={};
+   const surface=new THREE.Mesh(geometry);surface.matrixWorld.copy(mesh.matrixWorld);const orientation=new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().lookAt(hit.point.clone().add(hit.normal),hit.point,new THREE.Vector3(0,1,0)));
+   const decalGeometry=new DecalGeometry(surface,hit.point,orientation,new THREE.Vector3(width,height,Math.max(.045,width*.6)));geometry.dispose();
+   const material=new THREE.MeshStandardMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.85});const decal=new THREE.Mesh(decalGeometry,material);decal.renderOrder=5;this.scene.add(decal);this.decals.push(decal);
+  }
  }
  async updateFace(version){
   const c=this.config,signature=[c.face,c.faceVersion,c.avatar.presentation,c.avatar.build].join('|');
@@ -100,8 +107,9 @@ export class AvatarViewer{
   hairMap?.dispose();this.faceMap=map;this.faceSignature=signature;
  }
  clearFace(){const body=this.body?.getObjectByName('Body');if(body&&this.originalBodyGeometry){body.geometry.dispose();body.geometry=this.originalBodyGeometry;}this.originalBodyGeometry=null;const eyes=this.body?.getObjectByName('Eyes');if(eyes&&this.originalEyeGeometry){eyes.geometry.dispose();eyes.geometry=this.originalEyeGeometry;}this.originalEyeGeometry=null;this.portraitMap?.dispose();this.portraitMap=null;this.faceMap?.dispose();this.faceMap=null;this.faceSignature='';}
- clearLogo(){if(this.decal){this.scene.remove(this.decal);this.decal.geometry.dispose();this.decal.material.map?.dispose();this.decal.material.dispose();this.decal=null;}}
- clearModel(){this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
+ clearLogo(){for(const decal of this.decals||[]){this.scene.remove(decal);decal.geometry.dispose();decal.material.map?.dispose();decal.material.dispose();}this.decals=[];}
+ restoreAnatomy(){for(const [mesh,original] of this.sculpted||[]){mesh.geometry.dispose();mesh.geometry=original;}this.sculpted=null;this.anatomyKey='';}
+ clearModel(){this.anchorKey='';this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();this.restoreAnatomy();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
  reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
  control(action){if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
  resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.draw();}
@@ -113,5 +121,5 @@ export class AvatarViewer{
   }
  }
  fail(message){if(!this.stage)return;this.stage.classList.remove('model-ready');this.stage.classList.add('model-fallback');this.stage.querySelector('.model-status').textContent=message;}
- dispose(){this.disposed=true;this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
+ dispose(){this.disposed=true;this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.environment?.dispose();this.scene.traverse(o=>{if(o.isLight)o.shadow?.dispose();});this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
 }

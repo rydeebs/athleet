@@ -8,9 +8,9 @@ The portal now uses genuine 3D geometry and textured skin. These are reusable ge
 - Seven race outfit configurations assembled from fitted garment meshes. Tattoos use exposed skin; kit logos use garment surfaces. The model changes with each race's outfit.
 - Three.js rotation, keyboard controls, zoom, front/back reset, surface-projected sponsor text and PNG/JPEG/WebP artwork, and a clean model view without floating placement markers or an icon toolbar. Select placements from the list; drag to rotate and scroll/pinch to zoom.
 - Static WebP outfit previews in discovery, a lazy-loaded viewer on detail/editor screens, shared model/texture caching, one canvas per studio, render-on-change, and cleanup on navigation. No automatic animation or tracking.
-- Poster/error fallback if WebGL or assets fail. Placement lists remain usable. Uploaded logos stay in the current browser session.
+- Poster/error fallback if WebGL or assets fail. Placement lists remain usable. Draft logos stay local until requested; submitted logos persist with requests and appear together on approved race previews.
 
-The geometry is normalized to a 1.75 m template for placement consistency. Gender is chosen explicitly as Male or Female. Height, weight, age and ethnicity are not collected or inferred. Appearance does not alter pricing. Preview logos are approximate; final size, visibility, event rules and artwork remain an athlete/sponsor agreement. The tri-suit and wetsuit represent coverage, not a particular manufacturer's garment. Discovery posters show a standard build, skin tone and kit, rather than every profile variation.
+The geometry is normalized to a 1.75 m template for placement consistency. Gender is chosen explicitly as Male or Female. Height and weight are optional profile measurements; they do not yet resize the template. Age and ethnicity are not collected or inferred. Appearance does not alter pricing. Preview logos are approximate; final size, visibility, event rules and artwork remain an athlete/sponsor agreement. The tri-suit and wetsuit represent coverage, not a particular manufacturer's garment. Discovery posters show a standard build, skin tone and kit, rather than every profile variation.
 
 ## Scale
 
@@ -29,7 +29,7 @@ node scripts/prepare-athletes.mjs /tmp/athleet-source /path/to/Blender
 npm test
 ```
 
-The authoring command downloads approximately 267 MB of sources into the temporary directory, fits the mesh/proxies, builds clothes, exports GLBs without duplicate embedded textures, renders posters and converts them to WebP. Sources and Blender are not deployed. Inspect front/back coverage and all templates after changing geometry. The automated raycast test verifies all 378 placements across 63 presentation/build/outfit combinations, including skin/kit material correctness.
+The authoring command downloads approximately 267 MB of sources into the temporary directory, fits the mesh/proxies, builds clothes, exports GLBs without duplicate embedded textures, renders posters and converts them to WebP. Sources and Blender are not deployed. Inspect front/back coverage and all templates after changing geometry. The automated raycast test verifies all 1,008 placements across 63 presentation/build/outfit combinations, including skin/kit material correctness.
 
 ## Personal scans: next phase
 
@@ -46,7 +46,7 @@ Aim initially for 30–60k triangles, 1–2K texture maps and a 2–5 MB mobile 
 
 In Athlete portal → My profile, upload a front-facing JPG, PNG or WebP portrait (up to 8 MB, 32 MP), align its eyes/chin in the crop dialog and choose Apply to avatar. The Face / Full body tabs help inspect the result. Adjustment and removal are supported. Preview clothing is saved with avatar preferences and used as the starting outfit for new races; each race still has its own final outfit.
 
-The portrait is baked into the body's existing UV texture. Hair is fitted directly onto the scalp texture, with a conservative sampled-color continuation on the unseen rear. There is no floating hair card or face decal. Existing eyes use the same photograph through projected UVs, without a second eye surface. Authored geometry and normals are preserved, and face/body share one skin material and lighting response.
+The portrait is baked into the body's existing UV texture. Hair is fitted directly onto the scalp texture, with a conservative sampled-color continuation on the unseen rear. There is no floating hair card or face decal. Existing eyes use the same photograph through projected UVs, without a second eye surface. Eye normals remain authored; body normals are recomputed after continuous muscle relief, and face/body share one skin material and lighting response.
 
 On-device segmentation removes photo background/clothing, isolates hair, and samples cheek color. The body texture is matched to that sample. Overall skin brightness adjusts both the baked face and body together; 0 keeps the input colors. Skin preset swatches are disabled while a photo is applied, because the photo supplies its skin color. A manual cheek sample is available for difficult lighting.
 
@@ -54,7 +54,7 @@ This remains texture personalization of a generic head. It does not reconstruct 
 
 The local segmentation model (approximately 16 MB) and WASM runtime (approximately 11 MB for the selected browser variant) load only on the first Apply, then use immutable browser caching. These shared assets are not loaded by normal discovery or generic avatar use. Source and Apache 2.0 license are in `assets/vision/`. CPU segmentation can briefly occupy the main thread; low-memory mobile quality/performance needs device testing before a production photo rollout.
 
-The portrait and cropped texture remain in document memory/blob URLs. They are not sent to an API, written into profile JSON, saved to browser storage or shown to sponsors. They survive navigation inside the athlete portal but disappear on reload, sign-out or closing the tab. Save profile persists only gender/build/skin/kit/outfit preferences. This private beta is ready for evaluating portrait fit before implementing consented storage and publication.
+The portrait and cropped texture remain in document memory/blob URLs. They are not sent to an API, written into profile JSON, saved to browser storage or shown to sponsors. They survive navigation inside the athlete portal but disappear on reload, sign-out or closing the tab. Save profile persists only gender/build/skin/kit/outfit/environment preferences. This private beta is ready for evaluating portrait fit before implementing consented storage and publication.
 
 Implementation references: [Canvas image cropping](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage) and [Three.js surface decals](https://threejs.org/docs/pages/DecalGeometry.html).
 
@@ -69,3 +69,14 @@ Each segmented photo is balanced to the front photo's median skin sample. Camera
 The editor lazily loads the local Face Landmarker bundle (about 3.6 MB) and existing segmentation runtime. Photos are bounded to 1200 pixels on the long edge for processing. Originals, landmarks and derivatives remain in tab memory, are not stored with profiles or sent to a service, and disappear on reload/sign-out/removal. Closing the dialog cancels an in-progress build; an already applied preview stays intact on failed replacement. Draft photos can be revisited within the tab.
 
 Validation includes synthetic multi-camera geometry/visibility tests and a browser run with neutral rendered views. Real athlete-photo likeness and mobile performance still need pilot validation; do not advertise scan-level photorealism or persist/publish this private experimental result automatically.
+
+
+## Anatomical placements and scenes
+
+Male profiles offer left/right pectorals; female profiles offer a single upper chest/cleavage position. Both offer shoulders, upper arms, forearms, thighs and calves on each side, buttocks and upper back. Left/right refers to the athlete. Existing front-torso placements remain compatible. Clothing determines whether a location uses skin or kit. Raycasts follow each build’s visible surface; all 16 current/legacy anchors are checked across 63 asset/build/outfit combinations.
+
+The runtime bakes the chosen morph into a private geometry clone and adds restrained continuous pectoral/abdominal relief to body and clothing together. Fresh floating-point normals avoid quantized-normal lighting errors; UV seam normals are averaged. Shared assets remain unchanged. This improves definition, not identity reconstruction.
+
+Available inventory appears as surface-attached labels in the placement editor. Sponsor artwork uses simultaneous surface decals: confirmed logos plus the active proposal. JPG/PNG/WebP uploads are normalized to PNG; see SETUP.md for storage and access rules. If artwork cannot be loaded, the preview falls back to brand text. Dimensions remain illustrative.
+
+Studio, sci-fi arena, beach, city rooftop and mountain landscape use small procedural geometry sets, render only on changes, and dispose on switch/navigation. These are stylized environments. Backgrounds do not imply race location, conditions or permitted advertising. Accurate Marc-style full-body likeness remains dependent on a captured and optimized personal scan; face photos do not capture the person’s body.
