@@ -1,10 +1,18 @@
 # Connect the live portals
 
-The portal UI, Supabase integration, and database migration are implemented. A Supabase project has **not** been provisioned or migrated for Athleet. Until the two environment variables below are configured, the site displays a setup notice and offers an explicitly labeled device-local demo. It does not pretend that demo records are live listings.
+Athleet is connected to Supabase project `ujihkehrowmqgwuhuopg` as of 2026-10-01. All four migrations are applied. The project URL and publishable key are configured in ignored `.env.local` and the Vercel production/development environments. Production is `https://athleet.vercel.app`; preview deployments remain unconfigured until their own environment and auth redirects are set deliberately.
+
+Nine hosted integration checks passed using disposable accounts: sign-in, profile/race persistence, private Storage uploads/signed URLs, access restrictions, shortlisting, requests, exclusive reservation, and proof approval. All test records and files were removed. These checks use administratively confirmed temporary accounts and do not verify email delivery.
+
+**Remaining before external onboarding:** configure custom SMTP for confirmation/recovery emails and test delivery with a real recipient. Email confirmation remains enabled. No email provider credentials have been configured. The season-contact destination also remains unconfigured.
 
 ## 1. Create the database
 
-Create a dedicated Supabase project for Athleet in the intended organization. In that project's SQL Editor, run `supabase/migrations/202609300001_portals.sql`, `supabase/migrations/202609300002_performance.sql`, `supabase/migrations/202610010001_placements_artwork.sql`, and `supabase/migrations/202610010002_brand_links.sql`, once each in that order. Skip migrations already applied. Alternatively, link the checkout to that project and use `supabase db push`.
+The current checkout is linked to the Athleet project. On a new machine, run `supabase login`, then `supabase link --project-ref ujihkehrowmqgwuhuopg`. Inspect `supabase migration list` and `supabase db push --dry-run` before applying pending changes with `supabase db push`.
+
+The four existing migration files in `supabase/migrations` are already applied; do not paste them into the SQL Editor again. For future changes, create a new migration with `supabase migration new descriptive_name`, test it, then push it. Preserve migration history.
+
+`supabase/config.toml` configures an optional local Supabase stack. It is not a production configuration file; do not run `supabase config push` against production using those local URLs.
 
 The migration creates separate athlete and brand profiles, race listings, private sponsorship requests, and shortlists. All tables have row-level security enabled and no direct anonymous/authenticated table privileges. Narrow database functions enforce ownership, allowed transitions, price snapshots, and exclusive placement reservations. A public snapshot exposes published upcoming listings; private request bodies and proof links are restricted to the two parties.
 
@@ -44,7 +52,7 @@ The app supports registration, confirmation redirects, sign-in, password recover
 6. Submit an accessible HTTPS proof link as the athlete. Review it and complete the partnership as the sponsor.
 7. Verify password recovery on the real domain.
 
-Local checks already cover the database functions using an isolated PostgreSQL instance and the browser workflow using demo data. They do not replace a real Supabase email/auth integration test after connection.
+Local and hosted checks cover database functions and the hosted Auth/Storage flow. Complete the real confirmation-email and password-recovery journey after SMTP is connected.
 
 ## Current scope
 
@@ -60,6 +68,7 @@ Local checks already cover the database functions using an isolated PostgreSQL i
 ## Checks
 
 - `npm test`: build, deployment/API checks, audience parsers, portal validation, discovery, and safe configuration.
+- `node scripts/test-supabase.mjs --allow-live-test`: opt-in hosted test using `.env.local`, the linked Supabase project and `SUPABASE_ACCESS_TOKEN`. Creates temporary users and a synthetic listing, exercises Auth/Storage/booking, then removes only its own records. No emails are sent. Never run against an unrelated project.
 - `npm run test:database`: installs nothing; uses existing local PostgreSQL binaries to create a disposable database, stub Supabase identity, apply all four migrations (with a Storage schema stub), and exercise permissions and booking transitions. The temporary database is removed afterward.
 
 The demo (`?demo=1`) works with or without Supabase. Its fictional records and actions stay in browser local storage, separate from production data. Switching portals lets you act as the demo athlete Alex Rivera or Example Run Co. The other sample athletes illustrate discovery; use Alex's races to try both sides of a request.
