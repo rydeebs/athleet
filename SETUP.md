@@ -1,6 +1,6 @@
 # Connect the live portals
 
-enduur is connected to Supabase project `ujihkehrowmqgwuhuopg` as of 2026-10-01. All four migrations are applied. The project URL and publishable key are configured in ignored `.env.local` and the Vercel production/development environments. The brand is now enduur. Both `enduur.co` and `www.enduur.co` are attached to the existing Vercel project (`athleet`); www redirects to the apex. DNS activation is pending at GoDaddy. Until that is complete, production and the Supabase Site URL remain `https://athleet.vercel.app`. Exact `/athletes` and `/sponsors` auth redirects on both enduur domains are already allowed; preview deployments remain unconfigured until their own environment and auth redirects are set deliberately.
+enduur is connected to Supabase project `ujihkehrowmqgwuhuopg` as of 2026-10-01. All four migrations are applied. The project URL and publishable key are configured in ignored `.env.local` and the Vercel production/development environments. The brand is now enduur. Both `enduur.co` and `www.enduur.co` are attached to the existing Vercel project (`athleet`); www redirects to the apex. GoDaddy DNS is configured with `A @ 216.150.1.1` and `CNAME www d75a1368aafa66ec.vercel-dns-016.com`. Vercel validates both domains; HTTPS and the www redirect are verified. Production and the Supabase Site URL are `https://enduur.co`; `https://athleet.vercel.app` remains available for existing links. Exact `/athletes` and `/sponsors` auth redirects on both enduur domains are already allowed; preview deployments remain unconfigured until their own environment and auth redirects are set deliberately.
 
 Nine hosted integration checks passed using disposable accounts: sign-in, profile/race persistence, private Storage uploads/signed URLs, access restrictions, shortlisting, requests, exclusive reservation, and proof approval. All test records and files were removed. These checks use administratively confirmed temporary accounts and do not verify email delivery.
 
@@ -36,7 +36,7 @@ For local work, copy `.env.example` to `.env.local`, fill those two values, and 
 In Supabase Authentication:
 
 - Enable email/password sign-in and email confirmation.
-- Set the Site URL to `https://enduur.co` after its DNS and HTTPS are active.
+- The Site URL is `https://enduur.co`.
 - Allow the exact `/athletes` and `/sponsors` redirect URLs on that domain. Add the equivalent localhost URLs for local testing and intended preview URLs when testing Vercel previews.
 - Configure a production SMTP provider before inviting real users. Supabase's default email service is for limited testing.
 

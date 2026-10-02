@@ -1,5 +1,7 @@
 # enduur
 
+Live at [enduur.co](https://enduur.co). The existing GitHub repository and Vercel project retain their internal `athleet` names.
+
 An endurance athlete sponsorship marketplace with a preserved marketing homepage, separate athlete and sponsor portals, outfit-aware placement previews, and a live social-audience estimator.
 
 ## Run
