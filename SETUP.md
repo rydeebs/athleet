@@ -4,7 +4,7 @@ Athleet is connected to Supabase project `ujihkehrowmqgwuhuopg` as of 2026-10-01
 
 Nine hosted integration checks passed using disposable accounts: sign-in, profile/race persistence, private Storage uploads/signed URLs, access restrictions, shortlisting, requests, exclusive reservation, and proof approval. All test records and files were removed. These checks use administratively confirmed temporary accounts and do not verify email delivery.
 
-**Remaining before external onboarding:** configure custom SMTP for confirmation/recovery emails and test delivery with a real recipient. Email confirmation remains enabled. No email provider credentials have been configured. The season-contact destination also remains unconfigured.
+**Remaining before external onboarding:** Resend SMTP is configured with verified domain `enduur.co` and sender `Athleet <accounts@enduur.co>`. Delivery to a real recipient and the confirmation/recovery journey still need testing. Email confirmation remains enabled; the existing Supabase limit is 2 auth emails per hour and has not been changed. Review that limit before inviting a cohort. The season-contact destination also remains unconfigured.
 
 ## 1. Create the database
 

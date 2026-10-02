@@ -42,7 +42,7 @@ The price formula remains illustrative: $100–$200 plus $10–$30 per 1,000 com
 - `/sponsors`: race/location discovery, filters, shortlist, brand/logo placement preview, requests, and proof review.
 - Add `?demo=1` to try either portal with fictional data stored on this device. The two demo roles share that local dataset.
 
-The live account/database integration is connected to the Athleet Supabase project, with all four migrations applied and hosted integration checks passing. Custom SMTP still needs configuring before external users can receive confirmation and recovery emails. See [SETUP.md](SETUP.md) for the migration, Vercel settings, auth setup, and launch checks. The original homepage brief builder remains a browser-session planning tool.
+The live account/database integration is connected to the Athleet Supabase project, with all four migrations applied and hosted integration checks passing. Resend SMTP is configured; real confirmation/recovery delivery still needs testing, and the existing 2-auth-emails-per-hour limit needs review before cohort onboarding. See [SETUP.md](SETUP.md) for the migration, Vercel settings, auth setup, and launch checks. The original homepage brief builder remains a browser-session planning tool.
 
 No payments are processed. Requests reserve a single placement on a single race after athlete approval. Accepted terms are locked; competing requests for the same spot are declined. Final artwork and payment are coordinated directly. Proof is shared by HTTPS link and reviewed by the sponsor.
 
