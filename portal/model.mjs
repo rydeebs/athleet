@@ -1,3 +1,4 @@
+import {sponsorPrice} from './payments.mjs';
 import {placementZones,placementMaterial,scenes} from './placements.mjs';
 export {availableZones,scenes,rearZone} from './placements.mjs';
 import {raceTypes} from '../races.mjs';
@@ -33,7 +34,7 @@ export function normalizeAvatar(value={}) {const gender=value.gender==='female'|
  gender,presentation:gender==='female'?'feminine':'masculine',
  outfit:gender==='female'&&value.outfit==='shirtless'?'sports-bra':gender==='male'&&value.outfit==='sports-bra'?'shirtless':Object.hasOwn(outfits,value.outfit)?value.outfit:'singlet'
 };}
-export function newRace() {return {event_name:'',race_date:'',location:'',discipline:'Road running',distance:'5K',expected_field:null,finish_band:'',outfit:'singlet',phase:'Full race',placements:['chest','left-arm'],asking_price:250,deliverables:'1 race-day placement, 1 social post, and event photo proof.',notes:'',status:'draft',rules_confirmed:false};}
+export function newRace() {return {event_name:'',race_date:'',location:'',discipline:'Road running',distance:'5K',expected_field:null,finish_band:'',outfit:'singlet',phase:'Full race',placements:['chest','left-arm'],asking_price:250,placement_share:70,deliverables:'1 race-day placement, 1 social post, and event photo proof.',notes:'',status:'draft',rules_confirmed:false};}
 export function validateRace(race) {
  if(!race.event_name?.trim()||race.event_name.length>120)throw new Error('Add an event name (up to 120 characters).');
  if(!race.location?.trim()||race.location.length>120)throw new Error('Add the race location.');
@@ -42,6 +43,7 @@ export function validateRace(race) {
  if(!outfits[race.outfit])throw new Error('Choose your race outfit.');
  if(!['Full race','Bike + run','Bike only','Run only','Swim only'].includes(race.phase))throw new Error('Choose a race phase.');
  if(!Array.isArray(race.placements)||!race.placements.length||new Set(race.placements).size!==race.placements.length||race.placements.some(z=>!zones.includes(z)))throw new Error('Choose at least one available placement.');
+ if(race.placement_share!=null&&(!Number.isInteger(Number(race.placement_share))||race.placement_share<0||race.placement_share>100))throw new Error('Placement allocation must be between 0 and 100 percent.');
  if(!Number.isInteger(Number(race.asking_price))||race.asking_price<25||race.asking_price>1000000)throw new Error('Enter a whole-dollar package price between $25 and $1,000,000.');
  if(race.expected_field!==null&&race.expected_field!==''&&(!Number.isInteger(Number(race.expected_field))||race.expected_field<1||race.expected_field>1000000))throw new Error('Enter a valid expected field size.');
  if(!race.deliverables?.trim()||race.deliverables.length>1000)throw new Error('Describe the deliverables (up to 1,000 characters).');
@@ -57,7 +59,7 @@ export function filterListings(listings,filters={}) {
  (!filters.location||r.location.toLowerCase().includes(filters.location.toLowerCase()))&&
  (!filters.discipline||r.discipline===filters.discipline)&&(!filters.distance||r.distance===filters.distance)&&
  (!filters.from||r.race_date>=filters.from)&&(!filters.to||r.race_date<=filters.to)&&
- (!filters.budget||r.asking_price<=Number(filters.budget))&&
+ (!filters.budget||sponsorPrice(r.asking_price)<=Number(filters.budget))&&
  (!filters.audience||(r.profile?.audience?.total||0)>=Number(filters.audience))&&
  (!filters.placement||r.placements.some(z=>placementInfo(z,r.outfit).material===filters.placement&&!r.reserved?.includes(z)))&&
  r.placements.some(z=>!r.reserved?.includes(z));

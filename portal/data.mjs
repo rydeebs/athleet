@@ -1,3 +1,5 @@
+import {demoContract} from './payment-ui.mjs';
+import {PAYMENT_TERMS_VERSION} from './payments.mjs';
 import {normalizeBrandProfile} from './brand.mjs';
 import {createClient} from '@supabase/supabase-js';
 import {demoData} from './demo.mjs';
@@ -10,7 +12,7 @@ export class PortalData {
  async init(){
   if(this.demo){try{this.db=JSON.parse(localStorage.getItem(DEMO_KEY))||demoData();}catch{this.db=demoData();}this.user={id:this.role==='athlete'?'demo-athlete':'demo-sponsor'};return;}
   const response=await fetch('/api/portal-config');if(!response.ok)throw new Error('Could not load account settings. Refresh to try again.');
-  const c=await response.json();this.configured=c.configured;
+  const c=await response.json();this.configured=c.configured;this.payments=c.payments||{enabled:false,mode:'test'};
   if(!c.configured)return;
   this.client=createClient(c.url,c.key,{auth:{storage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   this.client.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY')this.recovery=true;});
@@ -23,7 +25,7 @@ export class PortalData {
   const sponsorMarks=id=>this.db.bookings.filter(b=>b.listing_id===id&&['accepted','submitted','completed'].includes(b.status)).map(b=>({placement:b.placement,brand_name:b.brand_name,brand_mark:b.brand_mark,brand_artwork:b.brand_artwork,status:b.status}));
   const listingWithProfile=r=>r?{...r,profile:this.db.profiles.find(p=>p.id===r.athlete_id),sponsors:sponsorMarks(r.id)}:null;
   const listings=this.db.listings.filter(r=>r.status==='published'||r.athlete_id===this.user.id).map(r=>({...listingWithProfile(r),reserved:this.db.bookings.filter(b=>b.listing_id===r.id&&['accepted','submitted','completed'].includes(b.status)).map(b=>b.placement)}));
-  return {profile:this.db.profiles.find(p=>p.id===this.user.id),listings,bookings:this.db.bookings.filter(b=>b.sponsor_id===this.user.id||this.db.listings.find(r=>r.id===b.listing_id)?.athlete_id===this.user.id).map(b=>({...b,listing:listingWithProfile(this.db.listings.find(r=>r.id===b.listing_id))})),shortlist:this.db.shortlist.filter(s=>s.user_id===this.user.id).map(s=>s.listing_id)};
+  return {payments:this.db.payments||[],payout_accounts:[],profile:this.db.profiles.find(p=>p.id===this.user.id),listings,bookings:this.db.bookings.filter(b=>b.sponsor_id===this.user.id||this.db.listings.find(r=>r.id===b.listing_id)?.athlete_id===this.user.id).map(b=>({...b,listing:listingWithProfile(this.db.listings.find(r=>r.id===b.listing_id))})),shortlist:this.db.shortlist.filter(s=>s.user_id===this.user.id).map(s=>s.listing_id)};
  }
  persist(){localStorage.setItem(DEMO_KEY,JSON.stringify(this.db));}
  async rpc(name,p){const {data,error}=await this.client.rpc(name,{p});if(error)throw new Error(error.message);return data;}
@@ -50,7 +52,8 @@ export class PortalData {
   if(!race||race.athlete_id===this.user.id||race.status!=='published')throw new Error('Choose another athlete’s published listing.');
   if(!race.placements.includes(p.placement))throw new Error('This placement is no longer available.');
   if(this.db.bookings.some(b=>b.listing_id===race.id&&b.placement===p.placement&&(['accepted','submitted','completed'].includes(b.status)||(b.sponsor_id===this.user.id&&b.status==='pending'))))throw new Error('This placement is already requested or reserved.');
-  const before=this.db.bookings;this.db.bookings=[{...p,id:crypto.randomUUID(),sponsor_id:this.user.id,status:'pending',created_at:new Date().toISOString(),price:race.asking_price,deliverables:race.deliverables,proof_url:null,proof_note:''},...before];try{this.persist();}catch(error){this.db.bookings=before;throw error;}
+  if(p.terms_version!==PAYMENT_TERMS_VERSION||!p.artwork_spec)throw new Error('Agree the booking rules and artwork instructions.');
+  const before=this.db.bookings;this.db.bookings=[{...p,id:crypto.randomUUID(),sponsor_id:this.user.id,status:'pending',created_at:new Date().toISOString(),contract:demoContract(race,p),price:race.asking_price,deliverables:race.deliverables,proof_url:null,proof_note:''},...before];this.db.payments??=[];const b=this.db.bookings[0];this.db.payments.push({booking_id:b.id,state:'unpaid',athlete_cents:b.contract.athlete_cents,total_cents:b.contract.total_cents});try{this.persist();}catch(error){this.db.bookings=before;throw error;}
  }
  async transition(id,status,proof={}){
   if(!this.demo)return this.rpc('transition_booking',{id,status,...proof});
@@ -58,7 +61,22 @@ export class PortalData {
   if(!b||!((athlete&&b.status==='pending'&&['accepted','declined'].includes(status))||(sponsor&&b.status==='pending'&&status==='cancelled')||(athlete&&b.status==='accepted'&&status==='submitted')||(sponsor&&b.status==='submitted'&&status==='completed')))throw new Error('This request can no longer be changed that way.');
   if(status==='accepted'&&this.db.bookings.some(x=>x.id!==id&&x.listing_id===b.listing_id&&x.placement===b.placement&&['accepted','submitted','completed'].includes(x.status)))throw new Error('This placement is already reserved.');
   if(status==='submitted'&&!safeProofUrl(proof.proof_url))throw new Error('Add an HTTPS link to your event photos and posts.');
+  const pay=this.db.payments?.find(p=>p.booking_id===id);
+  if(pay){if(status==='accepted'){if(proof.terms_version!==PAYMENT_TERMS_VERSION)throw new Error('Accept the booking rules.');pay.pay_by=new Date(Date.now()+48*3600000).toISOString();}if(status==='submitted'){if(pay.state!=='paid')throw new Error('Payment must be secured first.');if(b.contract.preapproval&&!pay.draft_approved_at)throw new Error('Get the content draft approved first.');pay.state='review';pay.review_by=new Date(Date.now()+72*3600000).toISOString();}if(status==='completed'){if(pay.state!=='review')throw new Error('Payment is not ready for approval.');pay.state='released';pay.earned_cents=pay.athlete_cents;}}
   Object.assign(b,{status,...proof});if(status==='accepted')for(const x of this.db.bookings)if(x.id!==id&&x.listing_id===b.listing_id&&x.placement===b.placement&&x.status==='pending')x.status='declined';this.persist();
+ }
+ async paymentApi(action,values={}){
+  if(this.demo){if(action!=='checkout')throw new Error('This action is not available in the demo.');const b=this.db.bookings.find(b=>b.id===values.id),p=this.db.payments?.find(p=>p.booking_id===values.id);if(!b||b.sponsor_id!==this.user.id||b.status!=='accepted'||p?.state!=='unpaid')throw new Error('This booking is not awaiting payment.');p.state='paid';const race=this.db.listings.find(r=>r.id===b.listing_id);p.proof_due=new Date(Date.parse(race.race_date+'T00:00:00Z')+8*86400000).toISOString();this.persist();return {paid:true};}
+  const {data}=await this.client.auth.getSession();const token=data.session?.access_token;if(!token)throw new Error('Sign in to continue.');
+  const response=await fetch('/api/payments',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action,...values})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Payment service unavailable.');return result;
+ }
+ async paymentAction(id,action,values={}){
+  if(!this.demo)return this.rpc('booking_payment_action',{id,action,...values});
+  const b=this.db.bookings.find(b=>b.id===id),p=this.db.payments?.find(p=>p.booking_id===id),r=this.db.listings.find(r=>r.id===b?.listing_id);if(!p||![b.sponsor_id,r?.athlete_id].includes(this.user.id))throw new Error('Booking unavailable.');
+  if(action==='issue'&&['paid','review'].includes(p.state)){p.state='disputed';p.issue=values.reason;}
+  else if(action==='draft'&&r.athlete_id===this.user.id&&p.state==='paid'){if(!safeProofUrl(values.url))throw new Error('Use an HTTPS link.');p.draft_url=values.url;p.draft_approved_at=null;}
+  else if(action==='approve-draft'&&b.sponsor_id===this.user.id&&p.state==='paid'&&p.draft_url)p.draft_approved_at=new Date().toISOString();
+  else throw new Error('Action unavailable.');this.persist();
  }
  async signIn(email,password){const {data,error}=await this.client.auth.signInWithPassword({email,password});if(error)throw error;this.user=data.user;}
  async signUp(email,password){const {data,error}=await this.client.auth.signUp({email,password,options:{emailRedirectTo:location.origin+'/'+(this.role==='athlete'?'athletes':'sponsors')}});if(error)throw error;this.user=data.session?.user;return !!data.session;}

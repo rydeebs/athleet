@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import assert from 'node:assert/strict';
 const dir=mkdtempSync(join(tmpdir(),'athleet-db-test-')),db=join(dir,'data');
 function run(bin,args,input){const r=spawnSync(bin,args,{input,encoding:'utf8'});if(r.status!==0)throw new Error(r.stderr||r.stdout||`Could not run ${bin}. Install PostgreSQL to run database tests.`);return r.stdout;}
-function sql(input){return run('psql',['-h',dir,'-U','postgres','-d','postgres','-X','-q','-t','-A','-v','ON_ERROR_STOP=1'],input).trim();}
+function sql(input){return run('psql',['-h',dir,'-U','postgres','-d','postgres','-X','-q','-t','-A','-v','ON_ERROR_STOP=1'],"set timezone='UTC';"+input).trim();}
 const ids={athlete:'00000000-0000-0000-0000-000000000001',sponsor:'00000000-0000-0000-0000-000000000002',other:'00000000-0000-0000-0000-000000000003'};
 const auth=(id,query,role='authenticated')=>`set role ${role};select set_config('request.jwt.claim.sub','${id||''}',false);${query}`;
 const payload=o=>`'${JSON.stringify(o).replaceAll("'","''")}'::jsonb`;
@@ -69,5 +69,64 @@ try{
  check('pending artwork is visible to the athlete but hidden from other sponsors',()=>{assert.equal(sql(auth(ids.athlete,`select count(*) from storage.objects where bucket_id='brand-artwork';`)).split('\n').at(-1),'1');assert.equal(sql(auth(ids.other,`select count(*) from storage.objects where bucket_id='brand-artwork';`)).split('\n').at(-1),'0');const snap=JSON.parse(sql(auth(ids.other,'select public.portal_snapshot();')).split('\n').at(-1));assert.deepEqual(snap.listings.find(r=>r.id===artRace).sponsors,[]);});
  sql(auth(ids.athlete,`select public.transition_booking(${payload({id:artBooking,status:'accepted'})});`));
  check('confirmed artwork is shared without private request fields and cannot be deleted',()=>{const snap=JSON.parse(sql(auth(ids.other,'select public.portal_snapshot();')).split('\n').at(-1)),mark=snap.listings.find(r=>r.id===artRace).sponsors[0];assert.equal(mark.brand_artwork,artPath);assert.equal(mark.message,undefined);assert.equal(mark.sponsor_id,undefined);assert.equal(sql(auth(ids.other,`select count(*) from storage.objects where bucket_id='brand-artwork';`)).split('\n').at(-1),'1');sql(auth(ids.sponsor,`delete from storage.objects where bucket_id='brand-artwork';`));assert.equal(sql(auth(ids.sponsor,`select count(*) from storage.objects where bucket_id='brand-artwork';`)).split('\n').at(-1),'1');assert.equal(sql(auth(null,`select count(*) from storage.objects where bucket_id='brand-artwork';`,'anon')).split('\n').at(-1),'0');});
+ // New migration is tested after the legacy lifecycle, then all new money paths below.
+ sql('create role service_role;');
+ sql(readFileSync('supabase/migrations/202610020001_payments.sql','utf8'));
+ sql(readFileSync('supabase/migrations/202610020002_payment_hardening.sql','utf8'));
+ const service=(action,p={})=>JSON.parse(sql(`select public.payment_service('${action}',${payload({livemode:false,...p})});`).split('\n').at(-1));
+ const call=(user,name,p)=>sql(auth(user,`select public.${name}(${payload(p)});`)).split('\n').at(-1);
+ const tomorrow=sql("select (current_date+1)::text;");
+ const paymentRace={...race,race_date:tomorrow,asking_price:100,placement_share:70,placements:['chest','left-arm','right-arm']};
+ const pr=call(ids.athlete,'save_race_listing',paymentRace);
+ const proposal={listing_id:pr,placement:'chest',brand_name:'Test Brand',message:'Agreed race and social campaign',terms_version:'2026-10-02',artwork_spec:'5 × 5 cm on chest',preapproval:true};
+ check('large valid quotes keep allocation arithmetic exact',()=>{const large=call(ids.athlete,'save_race_listing',{...paymentRace,asking_price:800000});const req=call(ids.sponsor,'request_placement',{...proposal,listing_id:large});const p=service('get',{id:req});assert.equal(p.contract.placement_cents,56000000);assert.equal(p.total_cents,96000000);});
+ check('payment RPC cannot be invoked by clients or anonymous users',()=>{for(const role of ['authenticated','anon'])assert.throws(()=>sql(auth(ids.sponsor,"select public.payment_service('queue');",role)),/permission denied/);for(const name of ['request_placement_before_payments','transition_booking_before_payments','save_race_listing_before_payments'])assert.throws(()=>call(ids.sponsor,name,{}),/permission denied/);});
+ check('request requires versioned terms and artwork scope',()=>{assert.throws(()=>call(ids.sponsor,'request_placement',{...proposal,terms_version:null}),/rules/);assert.throws(()=>call(ids.sponsor,'request_placement',{...proposal,artwork_spec:''}),/artwork/);});
+ const pb=call(ids.sponsor,'request_placement',proposal);
+ check('$100 athlete payout snapshots a $120 sponsor total and allocation',()=>{const p=service('get',{id:pb});assert.equal(p.athlete_cents,10000);assert.equal(p.markup_cents,2000);assert.equal(p.total_cents,12000);assert.equal(p.contract.placement_cents,7000);assert.equal(p.contract.social_cents,3000);});
+ check('legacy accepted booking cannot assert a payment or complete in new flow',()=>assert.throws(()=>call(ids.athlete,'transition_booking',{id:artBooking,status:'submitted',proof_url:'https://example.com/photos',complete:true}),/legacy request/));
+ check('acceptance requires both terms and ready payouts',()=>{assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'accepted'}),/rules/);assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'accepted',terms_version:'2026-10-02'}),/payouts/);});
+ service('account-get',{user_id:ids.athlete});service('account-save',{user_id:ids.athlete,account:'acct_test',ready:true});
+ call(ids.athlete,'transition_booking',{id:pb,status:'accepted',terms_version:'2026-10-02'});
+ check('unpaid acceptance cannot submit proof or release money',()=>{assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'submitted',complete:true,proof_url:'https://example.com/photos'}),/funded/);assert.throws(()=>call(ids.sponsor,'transition_booking',{id:pb,status:'completed'}),/submitted/);});
+ check('checkout is scoped to the sponsor and selected Stripe mode',()=>{assert.throws(()=>service('checkout-claim',{id:pb,actor:ids.other}),/not available/);assert.throws(()=>service('checkout-claim',{id:pb,actor:ids.sponsor,livemode:true}),/payout setup/);});
+ const claim=service('checkout-claim',{id:pb,actor:ids.sponsor});
+ check('repeated checkout claims freeze the key and expiration',()=>{const second=service('checkout-claim',{id:pb,actor:ids.sponsor});assert.equal(claim.checkout_key,second.checkout_key);assert.equal(claim.checkout_expires_at,second.checkout_expires_at);});
+ service('checkout-save',{id:pb,key:claim.checkout_key,session:'cs_test'});
+ check('payment amount, currency, and identifiers must match',()=>{for(const bad of [{amount:100},{currency:'eur'},{charge:null}])assert.throws(()=>service('paid',{id:pb,amount:12000,currency:'usd',intent:'pi_test',charge:'ch_test',...bad}),/mismatch/);});
+ service('paid',{id:pb,amount:12000,currency:'usd',intent:'pi_test',charge:'ch_test'});
+ check('duplicate verified payment cannot reset paid state or swap intent',()=>{assert.equal(service('paid',{id:pb,amount:12000,currency:'usd',intent:'pi_test',charge:'ch_test'}).state,'paid');assert.throws(()=>service('paid',{id:pb,amount:12000,currency:'usd',intent:'pi_other',charge:'ch_other'}),/Duplicate/);});
+ check('private payment summaries are participant-only and omit Stripe IDs',()=>{const sponsor=JSON.parse(sql(auth(ids.sponsor,'select public.portal_snapshot();')).split('\n').at(-1));assert.equal(sponsor.payments.find(p=>p.booking_id===pb).total_cents,12000);for(const name of ['charge_id','checkout_key','operation_key','payment_intent'])assert.equal(sponsor.payments[0][name],undefined);const other=JSON.parse(sql(auth(ids.other,'select public.portal_snapshot();')).split('\n').at(-1));assert.equal(other.payments.length,0);});
+ check('proof requires event completion and prior draft approval when agreed',()=>{assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'submitted',complete:true,proof_url:'https://example.com/photos'}),/after the event/);sql(`update public.race_listings set race_date=current_date where id='${pr}';`);assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'submitted',complete:true,proof_url:'https://example.com/photos'}),/draft approved/);});
+ call(ids.athlete,'booking_payment_action',{id:pb,action:'draft',url:'https://example.com/draft'});
+ check('only sponsoring account can approve draft',()=>assert.throws(()=>call(ids.athlete,'booking_payment_action',{id:pb,action:'approve-draft'}),/No content draft/));
+ call(ids.sponsor,'booking_payment_action',{id:pb,action:'approve-draft'});
+ call(ids.athlete,'transition_booking',{id:pb,status:'submitted',complete:true,proof_url:'https://example.com/photos'});
+ check('proof review clock waits for its notification',()=>{assert.equal(service('get',{id:pb}).review_by,null);service('notification-sent',{id:pb,kind:'proof',recipient:ids.sponsor});const p=service('get',{id:pb});assert.ok(p.review_by);const again=service('notification-sent',{id:pb,kind:'proof',recipient:ids.sponsor});assert.equal(again.review_by,p.review_by);});
+ check('a timely specific issue pauses automatic release',()=>{call(ids.sponsor,'booking_payment_action',{id:pb,action:'issue',reason:'The agreed social post was not delivered.'});sql(`update public.booking_payments set review_by=now()-interval '1 hour' where booking_id='${pb}';`);assert.equal(service('tick',{id:pb}).state,'disputed');assert.throws(()=>service('settle-claim',{id:pb}),/Not eligible/);});
+ check('dispute resolution validates earned amount',()=>{for(const earned_cents of [-1,10001,null])assert.throws(()=>service('resolve',{id:pb,earned_cents,reason:'Placement delivered; social post missing.'}),/earned amount/);});
+ service('resolve',{id:pb,earned_cents:7000,reason:'Placement delivered; social post missing.',actor:ids.other});
+ const op=service('settle-claim',{id:pb});
+ check('settlement retries preserve a single operation key',()=>assert.equal(service('settle-claim',{id:pb}).operation_key,op.operation_key));
+ service('refund-record',{id:pb,key:op.operation_key,refund:'re_test',amount:3600});
+ service('settled',{id:pb,key:op.operation_key,transfer:'tr_test'});
+ check('partial settlement keeps athlete earnings and sponsor refund separately',()=>{const p=service('get',{id:pb});assert.equal(p.state,'partially_refunded');assert.equal(p.earned_cents,7000);assert.equal(p.refund_cents,3600);assert.equal(p.booking_status,'completed');assert.throws(()=>service('settle-claim',{id:pb}),/Not eligible/);});
+ // A second request exercises automatic release and expiry with controllable DB deadlines.
+ sql(`update public.race_listings set race_date=current_date+1 where id='${pr}';`);
+ const secondPayment=call(ids.sponsor,'request_placement',{...proposal,placement:'left-arm',preapproval:false});
+ call(ids.athlete,'transition_booking',{id:secondPayment,status:'accepted',terms_version:'2026-10-02'});
+ service('paid',{id:secondPayment,amount:12000,currency:'usd',intent:'pi_second',charge:'ch_second'});
+ sql(`update public.race_listings set race_date=current_date where id='${pr}';`);
+ call(ids.athlete,'transition_booking',{id:secondPayment,status:'submitted',complete:true,proof_url:'https://example.com/photos'});
+ sql(`update public.booking_payments set review_by=now()-interval '1 second' where booking_id='${secondPayment}';`);
+ check('72-hour window is enforced even if cron has not run',()=>assert.throws(()=>call(ids.sponsor,'booking_payment_action',{id:secondPayment,action:'issue',reason:'Late objection after the review window.'}),/window has ended/));
+ check('silence after 72 hours makes full payout eligible',()=>{assert.equal(service('tick',{id:secondPayment}).state,'release_ready');assert.equal(service('get',{id:secondPayment}).earned_cents,10000);});
+ sql(`update public.race_listings set race_date=current_date+1 where id='${pr}';`);
+ const expiring=call(ids.sponsor,'request_placement',{...proposal,placement:'right-arm',preapproval:false});
+ call(ids.athlete,'transition_booking',{id:expiring,status:'accepted',terms_version:'2026-10-02'});
+ sql(`update public.booking_payments set pay_by=now()-interval '1 second' where booking_id='${expiring}';`);
+ check('expired unpaid reservation releases the placement',()=>{const p=service('expire',{id:expiring});assert.equal(p.state,'expired');assert.equal(p.booking_status,'cancelled');});
+ check('late payment cannot silently revive an expired reservation',()=>{const p=service('paid',{id:expiring,amount:12000,currency:'usd',intent:'pi_late',charge:'ch_late'});assert.equal(p.state,'disputed');assert.equal(p.booking_status,'cancelled');});
+
  console.log(`${passed} database integration checks passed on an isolated PostgreSQL database.`);
 }finally{if(started)run('pg_ctl',['-D',db,'-m','fast','-w','stop']);rmSync(dir,{recursive:true,force:true});}

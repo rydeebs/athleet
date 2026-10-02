@@ -6,6 +6,15 @@
   "functions": {
     "api/audience.js": {
       "maxDuration": 30
+    },
+    "api/payments.js": {
+      "maxDuration": 60
+    },
+    "api/stripe-webhook.js": {
+      "maxDuration": 60
+    },
+    "api/payments-cron.js": {
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -49,6 +58,12 @@
     {
       "source": "/for-sponsors",
       "destination": "/sponsor.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/payments-cron",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

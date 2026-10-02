@@ -38,20 +38,20 @@ try{
  assert.ok((await brand.from('sponsorship_requests').select('*')).error);ok('direct table access stays blocked');
  const ap=`${users[1]}/${randomUUID()}.png`,png=await sharp({create:{width:32,height:32,channels:4,background:'#20342a'}}).png().toBuffer();
  await value(brand.storage.from('brand-artwork').upload(ap,png,{contentType:'image/png'}));objects.push(['brand-artwork',ap]);
- const booking=await rpc(brand,'request_placement',{listing_id:raceId,placement:'left-pec',brand_name:'Athleet test brand',brand_mark:'TEST',message:'Disposable test',brand_artwork:ap});
+ const booking=await rpc(brand,'request_placement',{listing_id:raceId,placement:'left-pec',brand_name:'Athleet test brand',brand_mark:'TEST',message:'Disposable test',brand_artwork:ap,terms_version:'2026-10-02',artwork_spec:'5 × 5 cm test logo on left pectoral'});
  await rpc(brand,'set_shortlist',{listing_id:raceId,on:true});
  assert.ok((await rpc(brand,'portal_snapshot')).shortlist.includes(raceId));
  const logo=await value(athlete.storage.from('brand-artwork').createSignedUrl(ap,60));assert.equal((await fetch(logo.signedUrl)).status,200);ok('shortlist, sponsor request and private artwork work');
  const b=(await rpc(athlete,'portal_snapshot')).bookings.find(b=>b.listing_id===raceId);assert.ok(b);
- await rpc(athlete,'transition_booking',{id:b.id,status:'accepted'});
- assert.ok((await rpc(brand,'portal_snapshot')).listings.find(r=>r.id===raceId).reserved.includes('left-pec'));ok('athlete approval reserves the placement');
- assert.ok((await brand.rpc('request_placement',{p:{listing_id:raceId,placement:'left-pec',brand_name:'Athleet test brand'}})).error);ok('reserved placement cannot be requested again');
- await rpc(athlete,'transition_booking',{id:b.id,status:'submitted',proof_url:'https://example.com/test-proof',proof_note:'Integration test'});
- await rpc(brand,'transition_booking',{id:b.id,status:'completed'});assert.equal((await rpc(brand,'portal_snapshot')).bookings.find(x=>x.id===b.id).status,'completed');ok('proof submission and sponsor approval complete the partnership');
+ const snap=await rpc(brand,'portal_snapshot'),payment=snap.payments.find(p=>p.booking_id===b.id);
+ assert.equal(payment.athlete_cents,25000);assert.equal(payment.total_cents,30000);assert.equal(payment.state,'unpaid');ok('server snapshots athlete payout and sponsor total without marking payment secured');
+ assert.ok((await athlete.rpc('transition_booking',{p:{id:b.id,status:'accepted',terms_version:'2026-10-02'}})).error);ok('real account cannot accept without payout setup');
+ assert.ok((await brand.rpc('payment_service',{action:'paid',p:{id:b.id}})).error);ok('browser role cannot assert payment');
+ await rpc(brand,'transition_booking',{id:b.id,status:'cancelled'});assert.equal((await rpc(brand,'portal_snapshot')).bookings.find(x=>x.id===b.id).status,'cancelled');ok('pending request can be cancelled without money movement');
  console.log(`${passed} hosted integration checks passed.`);
 }finally{
  // Generated UUIDs only; never touches pre-existing users or listings.
- if(raceId){assert.match(raceId,/^[a-f0-9-]{36}$/);await query(`begin; delete from public.sponsorship_requests where listing_id='${raceId}'; delete from public.race_listings where id='${raceId}'; commit;`);}
+ if(raceId){assert.match(raceId,/^[a-f0-9-]{36}$/);await query(`begin; delete from public.payment_notifications where booking_id in(select id from public.sponsorship_requests where listing_id='${raceId}'); delete from public.payment_audit where booking_id in(select id from public.sponsorship_requests where listing_id='${raceId}'); delete from public.booking_payments where booking_id in(select id from public.sponsorship_requests where listing_id='${raceId}'); delete from public.sponsorship_requests where listing_id='${raceId}'; delete from public.race_listings where id='${raceId}'; commit;`);}
  for(const [bucket,path] of objects)await value(admin.storage.from(bucket).remove([path]));
  for(const id of users)await value(admin.auth.admin.deleteUser(id));
  console.log('Removed the disposable accounts, listings, requests and uploaded files.');
