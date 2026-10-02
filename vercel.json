@@ -58,6 +58,18 @@
     {
       "source": "/for-sponsors",
       "destination": "/sponsor.html"
+    },
+    {
+      "source": "/invite",
+      "destination": "/invite-athletes.html"
+    },
+    {
+      "source": "/invite/athletes",
+      "destination": "/invite-athletes.html"
+    },
+    {
+      "source": "/invite/brands",
+      "destination": "/invite-brands.html"
     }
   ],
   "crons": [

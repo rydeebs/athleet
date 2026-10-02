@@ -39,3 +39,5 @@ dialog:has(.likeness-editor){width:1000px;max-width:calc(100vw - 24px)}
 
 .payment-status{margin:20px 0;padding:18px 20px;background:#edf3df;border:1px solid #c9d6b7;border-radius:8px}
 .payment-status p:last-child{margin-bottom:0}.payment-rules p{line-height:1.6}.request-price .small{font-weight:400;margin-top:6px}.request-card h3{margin-top:12px}details.panel{margin-top:24px}details.panel summary{cursor:pointer;font-weight:600}.payment-rules{margin-top:20px}
+
+.pilot-welcome{font-size:14px!important;line-height:1.6;background:#e9efda;border-left:3px solid #829b42;padding:15px 18px;margin-bottom:25px!important;color:#283e34!important}

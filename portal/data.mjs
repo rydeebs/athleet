@@ -1,3 +1,4 @@
+import {pilotAttribution} from '../invite.mjs';
 import {demoContract} from './payment-ui.mjs';
 import {PAYMENT_TERMS_VERSION} from './payments.mjs';
 import {normalizeBrandProfile} from './brand.mjs';
@@ -79,7 +80,7 @@ export class PortalData {
   else throw new Error('Action unavailable.');this.persist();
  }
  async signIn(email,password){const {data,error}=await this.client.auth.signInWithPassword({email,password});if(error)throw error;this.user=data.user;}
- async signUp(email,password){const {data,error}=await this.client.auth.signUp({email,password,options:{emailRedirectTo:location.origin+'/'+(this.role==='athlete'?'athletes':'sponsors')}});if(error)throw error;this.user=data.session?.user;return !!data.session;}
+ async signUp(email,password){const {data,error}=await this.client.auth.signUp({email,password,options:{emailRedirectTo:location.origin+'/'+(this.role==='athlete'?'athletes':'sponsors'),...(pilotAttribution(location.search,this.role)?{data:{pilot_invitation:pilotAttribution(location.search,this.role)}}:{})}});if(error)throw error;this.user=data.session?.user;return !!data.session;}
  async reset(email){const {error}=await this.client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/'+(this.role==='athlete'?'athletes':'sponsors')});if(error)throw error;}
  async updatePassword(password){const {error}=await this.client.auth.updateUser({password});if(error)throw error;this.recovery=false;}
  async signOut(){if(this.client)await this.client.auth.signOut();location.href='/'+(this.role==='athlete'?'athletes':'sponsors');}
