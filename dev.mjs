@@ -16,4 +16,4 @@ createServer(async(req,res)=>{
   const response=await worker.fetch(new Request(`http://localhost:${port}${req.url}`,{method:req.method,headers:req.headers,...(req.method==='GET'||req.method==='HEAD'?{}:{body})}),process.env);
   res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch{res.writeHead(500);res.end('Server error');}
-}).listen(port,'127.0.0.1',()=>console.log(`Athleet preview: http://localhost:${port}`));
+}).listen(port,'127.0.0.1',()=>console.log(`enduur preview: http://localhost:${port}`));

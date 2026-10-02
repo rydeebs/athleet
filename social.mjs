@@ -44,7 +44,7 @@ export async function lookupAccount(account,fetcher=fetch){
    const raw=JSON.parse(await fetchText(`https://api.fxtwitter.com/${encodeURIComponent(handle)}`,{},fetcher));
    if(raw.code===200&&raw.user?.screen_name?.toLowerCase()===handle.toLowerCase()&&!raw.user.protected&&raw.user.followers!==undefined){count=parseCount(raw.user.followers);via='FxTwitter public profile';}
   }else{
-   try{const html=await fetchText(sourceUrl,{headers:{'User-Agent':'Mozilla/5.0 (compatible; Athleet/1.0)','Accept-Language':'en-US,en;q=0.9'}},fetcher);count=extractCount(html,platform,handle);}catch{}
+   try{const html=await fetchText(sourceUrl,{headers:{'User-Agent':'Mozilla/5.0 (compatible; enduur/1.0)','Accept-Language':'en-US,en;q=0.9'}},fetcher);count=extractCount(html,platform,handle);}catch{}
    if(!count){const markdown=await fetchText(`https://r.jina.ai/${sourceUrl}`,{headers:{'X-No-Cache':'true','X-Timeout':'10','Accept':'text/plain'}},fetcher);count=extractCount(markdown,platform,handle,{reader:true});via='Public profile via Jina Reader';}
   }
  }catch{}
