@@ -20,6 +20,7 @@ test('all 63 template/build/outfit combinations put every placement on the corre
     const hit=findPlacementHit(new Raycaster(),surfaces,zone);
     const label=`${presentation}/${build}/${outfit}/${zone}`;assert.ok(hit,`No surface: ${label}`);
     assert.equal(hit.object.name==='Body'?'skin':'kit',placementInfo(zone,outfit).material,`Wrong material: ${label}`);
+    if(zone.includes('shoulder')){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);assert.ok(normal.x*Math.sign(x)>.4,`Shoulder must face outward: ${label}`);assert.ok(Math.abs(hit.point.x)>.18,`Shoulder must be on the outer deltoid: ${label}`);}
    }
   }
  }
