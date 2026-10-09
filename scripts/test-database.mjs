@@ -128,5 +128,32 @@ try{
  check('expired unpaid reservation releases the placement',()=>{const p=service('expire',{id:expiring});assert.equal(p.state,'expired');assert.equal(p.booking_status,'cancelled');});
  check('late payment cannot silently revive an expired reservation',()=>{const p=service('paid',{id:expiring,amount:12000,currency:'usd',intent:'pi_late',charge:'ch_late'});assert.equal(p.state,'disputed');assert.equal(p.booking_status,'cancelled');});
 
+ sql(readFileSync('supabase/migrations/202610090001_media_kit.sql','utf8'));
+ const social={platform:'instagram',handle:'runner',verified:true,metrics:{followers:1000,avg_likes:35,avg_comments:5,post_count:10,as_of:'2026-01-01',verified:true}};
+ const saveSocial=(id,socials)=>call(id,'save_portal_profile',{...profile,socials});
+ const snapshot=id=>JSON.parse(sql(auth(id,'select public.portal_snapshot();',id?'authenticated':'anon')).split('\n').at(-1));
+ const review=p=>JSON.parse(sql(`set role service_role; select public.review_social_ownership(${payload(p)});`).split('\n').at(-1));
+ saveSocial(ids.athlete,[social]);
+ check('media kit metrics persist without forged ownership fields',()=>{const p=snapshot(ids.sponsor).listings.find(l=>l.athlete_id===ids.athlete).profile;assert.equal(p.socials[0].metrics.followers,1000);assert.equal(p.socials[0].verified,undefined);assert.equal(p.socials[0].metrics.verified,undefined);assert.deepEqual(snapshot(ids.sponsor).social_ownership,[]);});
+ check('invalid metric values and duplicate accounts fail server validation',()=>{for(const socials of [[social,{...social,handle:'@RUNNER'}],[{...social,metrics:{followers:-1,as_of:'2026-01-01'}}],[{...social,metrics:{followers:1,as_of:'2099-01-01'}}],[{...social,metrics:{followers:'NaN',as_of:'2026-01-01'}}],[{...social,metrics:{followers:1}}],[{...social,handle:'<script>'}]])assert.throws(()=>saveSocial(ids.athlete,socials));});
+ const start=(id=ids.athlete)=>JSON.parse(call(id,'social_ownership_action',{action:'start',platform:'instagram',handle:'runner'}));
+ const submit=(id=ids.athlete)=>JSON.parse(call(id,'social_ownership_action',{action:'submit',platform:'instagram',handle:'runner'}));
+ const challenge=start();
+ check('verification requires a saved own account and creates no premature badge',()=>{assert.throws(()=>start(ids.other),/Save this social/);assert.equal(start().code,challenge.code);assert.deepEqual(snapshot(ids.athlete).social_ownership,[]);assert.equal(snapshot(ids.athlete).my_social_reviews[0].code,challenge.code);assert.deepEqual(snapshot(ids.sponsor).my_social_reviews,[]);assert.ok(!JSON.stringify(snapshot(null)).includes(challenge.code));});
+ check('clients cannot write review records, bypass validation or approve themselves',()=>{for(const query of ['select * from public.social_ownership;',`update public.social_ownership set status='verified';`,`select public.review_social_ownership(${payload({action:'approve',id:challenge.id,observed_code:challenge.code,note:'Self approval attempt'})});`,`select public.save_portal_profile_before_media_kit(${payload(profile)});`,`select public.portal_snapshot_before_media_kit();`])assert.throws(()=>sql(auth(ids.athlete,query)),/permission denied/);});
+ submit();
+ check('operator queue works and wrong bio code cannot approve ownership',()=>{assert.equal(review({action:'list'}).length,1);assert.throws(()=>review({action:'approve',id:challenge.id,observed_code:'wrong',note:'Operator checked public profile'}),/code observed/);});
+ review({action:'approve',id:challenge.id,observed_code:challenge.code,note:'Operator observed live public bio code'});
+ check('public badge exposes no challenge or internal notes and preserves payment snapshot',()=>{const s=snapshot(ids.sponsor);assert.equal(s.social_ownership[0].status,'verified');assert.equal(s.social_ownership[0].code,undefined);assert.equal(s.social_ownership[0].review_note,undefined);assert.ok(Array.isArray(s.payments));assert.equal(snapshot(ids.athlete).my_social_reviews[0].review_note,undefined);});
+ saveSocial(ids.other,[social]);const otherChallenge=start(ids.other);submit(ids.other);
+ check('one social account cannot have two verified owners',()=>assert.throws(()=>review({action:'approve',id:otherChallenge.id,observed_code:otherChallenge.code,note:'Operator observed live public bio code'}),/one_verified_social_owner/));
+ saveSocial(ids.athlete,[]);
+ check('removing a handle revokes its ownership and re-adding requires a new challenge',()=>{assert.deepEqual(snapshot(ids.sponsor).social_ownership,[]);saveSocial(ids.athlete,[social]);assert.notEqual(start().code,challenge.code);assert.deepEqual(snapshot(ids.sponsor).social_ownership,[]);});
+ const fresh=start();submit();sql(`update public.social_ownership set expires_at=now()-interval '1 second' where id='${fresh.id}';`);
+ check('expired challenges cannot be submitted or approved',()=>{assert.throws(()=>submit(),/fresh verification/);assert.throws(()=>review({action:'approve',id:fresh.id,observed_code:fresh.code,note:'Operator observed live public bio code'}),/active review/);});
+ review({action:'approve',id:otherChallenge.id,observed_code:otherChallenge.code,note:'Operator observed live public bio code'});
+ sql(`update public.social_ownership set valid_until=now()-interval '1 second' where id='${otherChallenge.id}';`);
+ check('expired ownership disappears from public badges',()=>assert.deepEqual(snapshot(ids.other).social_ownership,[]));
+
  console.log(`${passed} database integration checks passed on an isolated PostgreSQL database.`);
 }finally{if(started)run('pg_ctl',['-D',db,'-m','fast','-w','stop']);rmSync(dir,{recursive:true,force:true});}

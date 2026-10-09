@@ -18,6 +18,16 @@ export const kitColors = ['#283e34','#24282c','#54697c','#854b40','#c8cdbe'];
 export const defaultAvatar = {skin:skins[2],build:'athletic',presentation:'masculine',gender:'male',outfit:'singlet',kit:kitColors[0],environment:'scifi'};
 export const defaultProfile = {display_name:'',location:'',bio:'',avatar:defaultAvatar,socials:[],audience:null,height_cm:null,weight_kg:null,performances:[]};
 export const money = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n || 0);
+// Prefer per-account reports; never silently treat a missing account as zero.
+export function reportedFollowers(profile={}) {
+ profile??={};
+ const valid=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+ const accounts=profile.socials||[];
+ const key=s=>`${s.platform}:${String(s.handle||'').replace(/^@/,'').toLowerCase()}`;
+ const values=accounts.map(s=>valid(s.metrics?.followers)?s.metrics.followers:(Array.isArray(profile.audience?.accounts)?profile.audience.accounts:[]).find(a=>a&&key(a)===key(s))?.followers);
+ if(values.some(valid))return values.every(valid)?values.reduce((a,b)=>a+b,0):null;
+ return valid(profile.audience?.total)?profile.audience.total:null;
+}
 export const count = n => new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1}).format(n || 0);
 export const dateLabel = value => value ? new Date(value+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'Date to confirm';
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -60,9 +70,9 @@ export function filterListings(listings,filters={}) {
  (!filters.discipline||r.discipline===filters.discipline)&&(!filters.distance||r.distance===filters.distance)&&
  (!filters.from||r.race_date>=filters.from)&&(!filters.to||r.race_date<=filters.to)&&
  (!filters.budget||sponsorPrice(r.asking_price)<=Number(filters.budget))&&
- (!filters.audience||(r.profile?.audience?.total||0)>=Number(filters.audience))&&
+ (!filters.audience||(reportedFollowers(r.profile)||0)>=Number(filters.audience))&&
  (!filters.placement||r.placements.some(z=>placementInfo(z,r.outfit).material===filters.placement&&!r.reserved?.includes(z)))&&
  r.placements.some(z=>!r.reserved?.includes(z));
- }).sort((a,b)=>filters.sort==='price'?a.asking_price-b.asking_price:filters.sort==='audience'?(b.profile?.audience?.total||0)-(a.profile?.audience?.total||0):a.race_date.localeCompare(b.race_date));
+ }).sort((a,b)=>filters.sort==='price'?a.asking_price-b.asking_price:filters.sort==='audience'?(reportedFollowers(b.profile)||0)-(reportedFollowers(a.profile)||0):a.race_date.localeCompare(b.race_date));
 }
 export function safeProofUrl(value) {try {const u=new URL(value);return u.protocol==='https:'&&value.length<=2000?u.href:null;}catch{return null;}}

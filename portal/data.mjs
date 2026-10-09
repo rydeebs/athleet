@@ -1,3 +1,4 @@
+import {normalizeSocials} from './media-kit.mjs';
 import {pilotAttribution} from '../invite.mjs';
 import {demoContract} from './payment-ui.mjs';
 import {PAYMENT_TERMS_VERSION} from './payments.mjs';
@@ -32,7 +33,7 @@ export class PortalData {
  async rpc(name,p){const {data,error}=await this.client.rpc(name,{p});if(error)throw new Error(error.message);return data;}
  async saveProfile(p){
   if(this.role!=='athlete'){p=normalizeBrandProfile(p);if(!this.demo)return this.rpc('save_brand_profile',p);const i=this.db.profiles.findIndex(r=>r.id===this.user.id);const before=this.db.profiles[i];if(i<0)this.db.profiles.push({...p,id:this.user.id});else this.db.profiles[i]={...p,id:this.user.id};try{this.persist();}catch(e){if(i<0)this.db.profiles.pop();else this.db.profiles[i]=before;throw e;}return;}
-  validateMeasurements(p);validatePerformances(p.performances||[],{pending:true});
+  p={...p,socials:normalizeSocials(p.socials||[])};validateMeasurements(p);validatePerformances(p.performances||[],{pending:true});
   const next={...p,height_cm:p.height_cm==null||p.height_cm===''?null:Number(p.height_cm),weight_kg:p.weight_kg==null||p.weight_kg===''?null:Number(p.weight_kg),performances:[]},uploaded=[];
   try{
    for(const result of p.performances||[]){const {evidence_file,...r}=result;if(evidence_file){if(evidence_file.type!=='image/jpeg'||evidence_file.size>2*1024*1024)throw new Error('Prepare a valid evidence image first.');r.evidence_path=`${this.user.id}/${crypto.randomUUID()}.jpg`;if(this.demo)await demoEvidence('put',r.evidence_path,evidence_file);else{const {error}=await this.client.storage.from('performance-evidence').upload(r.evidence_path,evidence_file,{contentType:'image/jpeg',upsert:false});if(error)throw new Error('Could not upload evidence. Check your connection and storage setup.');}uploaded.push(r.evidence_path);}if(!r.evidence_path?.startsWith(this.user.id+'/'))throw new Error('Evidence must belong to your account.');next.performances.push(r);}
