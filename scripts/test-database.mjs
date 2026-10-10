@@ -88,6 +88,8 @@ try{
  check('acceptance requires both terms and ready payouts',()=>{assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'accepted'}),/rules/);assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'accepted',terms_version:'2026-10-02'}),/payouts/);});
  service('account-get',{user_id:ids.athlete});service('account-save',{user_id:ids.athlete,account:'acct_test',ready:true});
  call(ids.athlete,'transition_booking',{id:pb,status:'accepted',terms_version:'2026-10-02'});
+ sql(readFileSync('supabase/migrations/202610100001_sponsor_spot_details.sql','utf8'));
+ check('sponsor spot cards expose the agreed total without private booking or payment fields',()=>{const snap=JSON.parse(sql(auth(ids.other,'select public.portal_snapshot();')).split('\n').at(-1)),mark=snap.listings.find(r=>r.id===pr).sponsors[0];assert.equal(mark.sponsor_total_cents,12000);assert.deepEqual(Object.keys(mark).sort(),['brand_artwork','brand_mark','brand_name','placement','sponsor_total_cents','status']);assert.throws(()=>sql(auth(ids.other,`select public.listing_sponsor_marks('${pr}');`)),/permission denied/);});
  check('unpaid acceptance cannot submit proof or release money',()=>{assert.throws(()=>call(ids.athlete,'transition_booking',{id:pb,status:'submitted',complete:true,proof_url:'https://example.com/photos'}),/funded/);assert.throws(()=>call(ids.sponsor,'transition_booking',{id:pb,status:'completed'}),/submitted/);});
  check('checkout is scoped to the sponsor and selected Stripe mode',()=>{assert.throws(()=>service('checkout-claim',{id:pb,actor:ids.other}),/not available/);assert.throws(()=>service('checkout-claim',{id:pb,actor:ids.sponsor,livemode:true}),/payout setup/);});
  const claim=service('checkout-claim',{id:pb,actor:ids.sponsor});

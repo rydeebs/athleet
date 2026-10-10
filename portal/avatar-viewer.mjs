@@ -20,14 +20,15 @@ export class AvatarViewer{
  constructor(){
   this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(32,1,.05,30);this.renderer=new THREE.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});
   this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.05;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;this.renderer.shadowMap.autoUpdate=false;
-  this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','Rotate athlete with arrow keys. Plus and minus zoom.');
-  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=true;this.controls.minDistance=.35;this.controls.maxDistance=4.8;this.controls.minPolarAngle=.65;this.controls.maxPolarAngle=2.05;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
+  this.canvas=this.renderer.domElement;this.canvas.tabIndex=0;this.canvas.setAttribute('aria-label','Rotate athlete left or right with arrow keys. Plus and minus zoom. Home returns to the full body.');
+  this.controls=new OrbitControls(this.camera,this.canvas);this.controls.target.set(0,.9,0);this.controls.enablePan=false;this.controls.enableZoom=true;this.controls.minDistance=.35;this.controls.maxDistance=4.8;this.controls.minPolarAngle=Math.PI/2;this.controls.maxPolarAngle=Math.PI/2;this.controls.enableDamping=false;this.controls.addEventListener('change',()=>this.draw());
   this.scene.add(new THREE.HemisphereLight(0xfff6e8,0x63756a,.95));
   for(const [pos,color,intensity] of [[[-3,4,4],0xfff4e5,3.7],[[3,2,2],0xd9eaff,.8],[[1,3,-3],0xffffff,2]]){const light=new THREE.DirectionalLight(color,intensity);light.position.set(...pos);if(pos[0]===-3){light.castShadow=true;light.shadow.mapSize.set(1024,1024);Object.assign(light.shadow.camera,{left:-1.4,right:1.4,top:2,bottom:-1,near:.1,far:12});light.shadow.bias=-.0005;light.shadow.normalBias=.01;}this.scene.add(light);}
   const floor=new THREE.Mesh(new THREE.CircleGeometry(.5,64),new THREE.MeshBasicMaterial({color:0x63785e,transparent:true,opacity:.1,depthWrite:false}));floor.rotation.x=-Math.PI/2;floor.position.y=-.006;this.scene.add(floor);this.floor=floor;
   this.ray=new THREE.Raycaster();this.resizeObserver=new ResizeObserver(()=>this.resize());this.version=0;
   this.onKey=e=>{const c={ArrowLeft:'left',ArrowRight:'right','+':'in','=':'in','-':'out',Home:'reset'}[e.key];if(c){e.preventDefault();this.control(c);}};this.canvas.addEventListener('keydown',this.onKey);
-  this.onClick=e=>{const b=e.target.closest('[data-model-control]');if(b)this.control(b.dataset.modelControl);};
+  this.onClick=e=>{const zone=e.target.closest('[data-model-zone]');if(zone){this.stage.dispatchEvent(new CustomEvent('placement-focus',{bubbles:true,detail:{zone:zone.dataset.modelZone}}));return;}const b=e.target.closest('[data-model-control]');if(b)this.control(b.dataset.modelControl);};
+  this.onInteraction=()=>{if(this.cameraFrame)cancelAnimationFrame(this.cameraFrame);this.cameraFrame=null;};this.canvas.addEventListener('pointerdown',this.onInteraction);
   this.onContextLost=e=>{e.preventDefault();this.lightsPaused=true;this.syncMotion();this.fail('3D paused by your browser. Reload to restore it; the placement list still works.');};this.canvas.addEventListener('webglcontextlost',this.onContextLost);
   this.motionPreference=matchMedia('(prefers-reduced-motion: reduce)');this.lightsPaused=this.motionPreference.matches;this.inView=false;this.motionTime=0;
   this.onMotionPreference=()=>{this.lightsPaused=this.motionPreference.matches;this.syncMotion();};this.motionPreference.addEventListener('change',this.onMotionPreference);
@@ -59,6 +60,7 @@ export class AvatarViewer{
     m.needsUpdate=true;if(o.visible&&!['Hair','Eyes','Shoes'].includes(name))this.surfaces.push(o);
    });
    this.body.updateMatrixWorld(true);if(this.anatomyKey!==anatomyKey){this.sculpted=new Map();this.body.traverse(o=>{if(o.isMesh&&!['Hair','Eyes','Shoes'].includes(o.name)){this.sculpted.set(o,o.geometry);o.geometry=athleticGeometry(o,a);}});this.anatomyKey=anatomyKey;}if(config.faceDetails?.skin)this.matchSkin(skin,config.faceDetails.skin);const anchorKey=anatomyKey+'|'+config.outfit;if(this.anchorKey!==anchorKey){this.findAnchors();this.anchorKey=anchorKey;}await this.updateFace(version);if(version!==this.version)return;await this.updateLogo(version);if(version!==this.version)return;
+   if(!old||old.focusZone!==config.focusZone||old.viewKey!==config.viewKey)this.focusPlacement(config.focusZone);
    stage.classList.remove('model-fallback');stage.classList.add('model-ready');stage.querySelector('.model-status').textContent='';this.renderer.shadowMap.needsUpdate=true;this.draw();
   }catch(error){if(version===this.version)this.fail('3D unavailable. Outfit preview shown; use the placement list below.');throw error;}
  }
@@ -76,24 +78,24 @@ export class AvatarViewer{
  findAnchors(){
   this.points={};for(const [zone,[x,y,side]] of Object.entries(anchors)){
    const hit=findPlacementHit(this.ray,this.surfaces,zone);
-   if(hit){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);this.points[zone]={...hit,normal};}
+   if(hit){const normal=(hit.normal||hit.face.normal).clone().transformDirection(hit.object.matrixWorld);this.points[zone]={...hit,normal};}
   }
  }
  async updateLogo(version){
   this.clearLogo();const c=this.config,marks=new Map();
-  if(c.showSlots)for(const zone of c.available||c.selected||[])if(!c.reserved.includes(zone))marks.set(zone,{zone,brand:'AVAILABLE',placeholder:true});
+  if(c.showSlots)for(const zone of c.available||c.selected||[])if(!c.reserved.includes(zone))marks.set(zone,{zone,brand:'+',placeholder:true});
   for(const mark of c.marks||[])marks.set(mark.zone,mark);
   if(c.active&&(c.logo||c.brand))marks.set(c.active,{zone:c.active,logo:c.logo,brand:c.brand});
   this.decals=[];
   for(const mark of marks.values()){
    const hit=this.points[mark.zone];if(!hit)continue;let map,aspect;
    if(mark.logo){try{map=await textures.loadAsync(mark.logo);map.colorSpace=THREE.SRGBColorSpace;aspect=map.image.width/map.image.height;}catch{map=null;}}
-   if(!map){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d');if(mark.placeholder){ctx.fillStyle='#deefabbb';ctx.fillRect(8,8,496,240);ctx.strokeStyle='#536546';ctx.lineWidth=8;ctx.strokeRect(8,8,496,240);}if(!mark.placeholder){ctx.fillStyle='#f8faf0';ctx.fillRect(8,8,496,240);}ctx.fillStyle='#21392b';ctx.font=mark.placeholder?'700 64px Arial':'700 140px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((mark.brand||'SPONSOR').slice(0,24),256,132,480);map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;aspect=2;}
+   if(!map){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=256;const ctx=canvas.getContext('2d');if(mark.placeholder){ctx.fillStyle='#c8ed7933';ctx.fillRect(10,10,492,236);ctx.strokeStyle='#b9e85e';ctx.lineWidth=5;ctx.strokeRect(10,10,492,236);}if(!mark.placeholder){ctx.fillStyle='#f8faf0';ctx.fillRect(8,8,496,240);}ctx.fillStyle='#21392b';ctx.font=mark.placeholder?'400 140px Arial':'700 140px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((mark.brand||'SPONSOR').slice(0,24),256,132,480);map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;aspect=mark.placeholder?1.25:2;}
    if(version!==this.version||this.disposed){map.dispose();return;}
    const maxWidth=placementZones[mark.zone]?.width||.1,height=Math.min(maxWidth/aspect,.12),width=height*aspect;
    const mesh=hit.object,geometry=mesh.geometry.clone(),position=geometry.attributes.position,v=new THREE.Vector3();for(let i=0;i<position.count;i++){mesh.getVertexPosition(i,v);position.setXYZ(i,v.x,v.y,v.z);}geometry.morphAttributes={};
    const surface=new THREE.Mesh(geometry);surface.matrixWorld.copy(mesh.matrixWorld);const orientation=new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().lookAt(hit.point.clone().add(hit.normal),hit.point,new THREE.Vector3(0,1,0)));
-   const decalGeometry=new DecalGeometry(surface,hit.point,orientation,new THREE.Vector3(width,height,Math.max(.045,width*.6)));geometry.dispose();
+   const decalGeometry=new DecalGeometry(surface,hit.point,orientation,new THREE.Vector3(width,height,Math.max(.09,width*1.05)));geometry.dispose();
    const material=new THREE.MeshStandardMaterial({map,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,roughness:.85});const decal=new THREE.Mesh(decalGeometry,material);decal.renderOrder=5;this.scene.add(decal);this.decals.push(decal);
   }
  }
@@ -115,17 +117,25 @@ export class AvatarViewer{
  clearLogo(){for(const decal of this.decals||[]){this.scene.remove(decal);decal.geometry.dispose();decal.material.map?.dispose();decal.material.dispose();}this.decals=[];}
  restoreAnatomy(){for(const [mesh,original] of this.sculpted||[]){mesh.geometry.dispose();mesh.geometry=original;}this.sculpted=null;this.anatomyKey='';}
  clearModel(){this.anchorKey='';this.matchedSkin?.dispose();this.matchedSkin=null;this.skinKey='';this.clearLogo();this.clearFace();this.restoreAnatomy();if(this.body){this.scene.remove(this.body);this.body.traverse(o=>{if(o.isMesh)o.material.dispose();});this.body=null;}}
- reset(){if(this.config?.closeup){this.camera.position.set(0,1.63,.65);this.controls.target.set(0,1.622,.03);this.controls.update();return;}this.camera.position.set(this.config?.view==='back'?-.16:.16,1.05,this.config?.view==='back'?-3.5:3.5);this.controls.target.set(0,.9,0);this.controls.update();}
+ fitDistance(){const fov=this.camera.fov*Math.PI/180;return Math.max(1.88/(2*Math.tan(fov/2)),.86/(2*Math.tan(fov/2)*this.camera.aspect));}
+ reset(){this.onInteraction();if(this.config?.closeup){this.camera.position.set(0,1.622,.68);this.controls.target.set(0,1.622,.03);}else{this.controls.target.set(0,.885,0);this.camera.position.set(0,.885,(this.config?.view==='back'?-1:1)*this.fitDistance());}this.controls.update();}
+ focusPlacement(zone){
+  const hit=this.points?.[zone];if(!zone||!hit){if(!this.config.closeup)this.reset();return;}
+  this.onInteraction();const target=hit.point.clone();const direction=new THREE.Vector3(hit.normal.x,0,hit.normal.z).normalize();if(direction.lengthSq()<.1)direction.set(0,0,1);const distance=zone==='back'||zone==='butt'||zone==='chest'?1.15:.88;
+  const end=target.clone().addScaledVector(direction,distance),start=this.camera.position.clone(),origin=this.controls.target.clone(),time=performance.now();
+  const step=now=>{const t=this.motionPreference.matches?1:Math.min(1,(now-time)/420),k=t*t*(3-2*t);this.camera.position.lerpVectors(start,end,k);this.controls.target.lerpVectors(origin,target,k);this.controls.update();this.draw();if(t<1)this.cameraFrame=requestAnimationFrame(step);else this.cameraFrame=null;};this.cameraFrame=requestAnimationFrame(step);
+ }
+
  syncMotion(){if(this.animationFrame!=null)cancelAnimationFrame(this.animationFrame);this.animationFrame=null;this.lastFrame=0;const button=this.stage?.querySelector('[data-model-control=motion]');if(button){button.textContent=this.lightsPaused?'Play lights':'Pause lights';button.setAttribute('aria-label',this.lightsPaused?'Play background lights':'Pause background lights');}if(!this.disposed&&!this.lightsPaused&&this.inView&&!document.hidden)this.animationFrame=requestAnimationFrame(this.animate);}
- control(action){if(action==='motion'){this.lightsPaused=!this.lightsPaused;this.syncMotion();return;}if(action==='reset')this.reset();else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(2.1,4.8);this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
- resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.draw();}
+ control(action){if(action==='motion'){this.lightsPaused=!this.lightsPaused;this.syncMotion();return;}if(action==='reset'){this.stage.dispatchEvent(new CustomEvent('placement-focus',{bubbles:true,detail:{zone:''}}));this.reset();}else{const offset=this.camera.position.clone().sub(this.controls.target);if(action==='left'||action==='right')offset.applyAxisAngle(new THREE.Vector3(0,1,0),action==='left'?-.35:.35);else offset.multiplyScalar(action==='in'?.86:1.16).clampLength(.35,Math.max(4.8,this.fitDistance()*1.2));this.camera.position.copy(this.controls.target).add(offset);this.controls.update();}this.draw();}
+ resize(){if(!this.stage||this.disposed)return;const {width,height}=this.stage.querySelector('.model-viewport').getBoundingClientRect();if(!width||!height)return;this.renderer.setSize(width,height,false);this.camera.aspect=width/height;this.camera.updateProjectionMatrix();this.controls.maxDistance=Math.max(4.8,this.fitDistance()*1.2);if(!this.config?.focusZone&&!this.config?.closeup){const direction=this.camera.position.clone().sub(this.controls.target).normalize();this.camera.position.copy(this.controls.target).addScaledVector(direction,this.fitDistance());this.controls.update();}this.draw();}
  draw(){if(this.disposed||!this.stage)return;this.renderer.render(this.scene,this.camera);const viewport=this.stage.querySelector('.model-viewport'),w=viewport.clientWidth,h=viewport.clientHeight;
-  for(const button of this.stage.querySelectorAll('.body-hotspot')){const p=this.points?.[button.dataset.zone];if(!p){button.hidden=true;continue;}const facing=p.normal.dot(this.camera.position.clone().sub(p.point).normalize())>.15;const projected=p.point.clone().project(this.camera);
+  for(const button of this.stage.querySelectorAll('.body-hotspot')){const p=this.points?.[button.dataset.modelZone];if(!p){button.hidden=true;continue;}const facing=p.normal.dot(this.camera.position.clone().sub(p.point).normalize())>.15;const projected=p.point.clone().project(this.camera);
    // Raycast from the camera to avoid markers showing through an arm or the body.
    this.ray.set(this.camera.position,p.point.clone().sub(this.camera.position).normalize());const blocker=this.ray.intersectObjects(this.surfaces,false)[0];const visible=facing&&projected.z<1&&(!blocker||blocker.distance>=this.camera.position.distanceTo(p.point)-.025);
-   button.hidden=!visible;button.style.left=(projected.x*.5+.5)*w+'px';button.style.top=(-projected.y*.5+.5)*h+(button.dataset.zone===this.config.active?34:0)+'px';
+   button.hidden=!visible;button.style.left=(projected.x*.5+.5)*w+'px';button.style.top=(-projected.y*.5+.5)*h+'px';
   }
  }
  fail(message){if(!this.stage)return;this.stage.classList.remove('model-ready');this.stage.classList.add('model-fallback');this.stage.querySelector('.model-status').textContent=message;}
- dispose(){this.disposed=true;this.syncMotion();this.motionObserver.disconnect();this.motionPreference.removeEventListener('change',this.onMotionPreference);document.removeEventListener('visibilitychange',this.onVisibility);this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.environment?.dispose();this.scene.traverse(o=>{if(o.isLight)o.shadow?.dispose();});this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
+ dispose(){this.disposed=true;this.onInteraction();this.canvas.removeEventListener('pointerdown',this.onInteraction);this.syncMotion();this.motionObserver.disconnect();this.motionPreference.removeEventListener('change',this.onMotionPreference);document.removeEventListener('visibilitychange',this.onVisibility);this.version++;this.resizeObserver.disconnect();this.stage?.removeEventListener('click',this.onClick);this.canvas.removeEventListener('keydown',this.onKey);this.canvas.removeEventListener('webglcontextlost',this.onContextLost);this.controls.dispose();this.clearModel();this.environment?.dispose();this.scene.traverse(o=>{if(o.isLight)o.shadow?.dispose();});this.floor.geometry.dispose();this.floor.material.dispose();this.renderer.dispose();this.renderer.forceContextLoss();this.canvas.remove();}
 }

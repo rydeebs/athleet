@@ -1,3 +1,4 @@
+import {athleticGeometry,relaxedPosePoint} from '../portal/anatomy.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,stat} from 'node:fs/promises';
@@ -14,7 +15,9 @@ test('all 63 template/build/outfit combinations put every placement on the corre
   assert.equal(bytes.toString('utf8',0,4),'glTF');assert.ok(bytes.length<2_000_000,'geometry download exceeds budget');
   const {scene}=await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   scene.updateMatrixWorld(true);
-  for(const build of ['lean','athletic','strong'])for(const [outfit,clothes] of Object.entries(garments)){
+  for(const build of ['lean','athletic','strong']){
+   const originals=new Map();scene.traverse(mesh=>{if(!mesh.isMesh||['Hair','Eyes','Shoes'].includes(mesh.name))return;if(mesh.morphTargetInfluences)for(const [name,i] of Object.entries(mesh.morphTargetDictionary))mesh.morphTargetInfluences[i]=name===build?1:0;originals.set(mesh,mesh.geometry);mesh.geometry=athleticGeometry(mesh,{presentation,gender:presentation==='feminine'?'female':'male',build});});
+   for(const [outfit,clothes] of Object.entries(garments)){
    const surfaces=[];scene.traverse(mesh=>{if(!mesh.isMesh)return;if(mesh.morphTargetInfluences)for(const [name,i] of Object.entries(mesh.morphTargetDictionary))mesh.morphTargetInfluences[i]=name===build?1:0;if(['Body',...clothes].includes(mesh.name))surfaces.push(mesh);});
    for(const [zone,[x,y,side]] of Object.entries(anchors)){
     const hit=findPlacementHit(new Raycaster(),surfaces,zone);
@@ -22,6 +25,8 @@ test('all 63 template/build/outfit combinations put every placement on the corre
     assert.equal(hit.object.name==='Body'?'skin':'kit',placementInfo(zone,outfit).material,`Wrong material: ${label}`);
     if(zone.includes('shoulder')){const normal=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);assert.ok(normal.x*Math.sign(x)>.4,`Shoulder must face outward: ${label}`);assert.ok(Math.abs(hit.point.x)>.18,`Shoulder must be on the outer deltoid: ${label}`);}
    }
+  }
+  for(const [mesh,original] of originals){mesh.geometry.dispose();mesh.geometry=original;}
   }
  }
 });
@@ -61,4 +66,18 @@ test('athletic relief preserves source assets, outward unit normals and placemen
   for(const zone of ['left-pec','right-pec','cleavage','left-shoulder','right-forearm','left-calf'])assert.ok(findPlacementHit(new Raycaster(),[body],zone),zone);
   sculpt.dispose();
  }
+});
+
+
+test('relaxed pose lowers both hands symmetrically without changing the head or legs',()=>{
+ const right=relaxedPosePoint(new Vector3(.53,1.0,.28)),left=relaxedPosePoint(new Vector3(-.53,1.0,.28));
+ assert.ok(right.x<.34&&right.y<.92&&right.z<.13,'hands should rest beside the hips, not reach forward');
+ assert.equal(left.x,-right.x);assert.equal(left.y,right.y);assert.equal(left.z,right.z);
+ for(const p of [new Vector3(.02,1.65,.04),new Vector3(.12,.5,.05)])assert.deepEqual(relaxedPosePoint(p.clone()),p);
+});
+test('sponsor hotspots include reserved areas and expose selection accessibly',()=>{
+ const html=avatarStudio({hotspots:true,available:['left-pec','right-pec'],reserved:['left-pec'],focusZone:'left-pec'});
+ assert.match(html,/data-model-zone="left-pec"[^>]+reserved[^>]+aria-pressed="true"/);
+ assert.match(html,/data-model-zone="right-pec"/);assert.ok(!html.includes('data-model-zone="back"'));
+ assert.ok(!avatarStudio({}).includes('TAP +'));
 });
