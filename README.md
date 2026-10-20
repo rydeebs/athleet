@@ -20,11 +20,13 @@ The Sites sign-in gate does not transfer to Vercel. Choose Vercel Deployment Pro
 
 After deployment, check `/`, add a mixed-race package, and calculate an audience from a public handle. Social sites can block the Vercel hosting IP just as they can block other hosting providers; successful local tests do not guarantee every profile is readable in production. Instagram remains best-effort, and blocked accounts show an error instead of a fabricated total.
 
-## Sponsor product page
+## Sponsor campaign planning
 
-`/for-sponsors` presents the race-weekend package for brand buyers: athlete placement, optional Race-day digital follow, example pricing and a season offer. Homepage sponsor links lead here; `/sponsors` remains the workspace. The page uses illustrative inventory and explicitly labels digital follow, category locks and managed payment release as proposed. None of those services or checkout flows is implemented by this page.
+`/sponsors` helps brands evaluate athletes and enter discovery. `/for-sponsors` has a distinct campaign-planning purpose: example scopes requiring athlete quotes, rights, production, reporting and a device-local season brief download. It publishes no fabricated price points or available inventory. The brief is downloaded only, never submitted or booked.
 
-The season CTA currently opens a device-local brief generator, with an explicit notice that enquiries are not connected. Configure a real contact email, booking destination or intake endpoint before treating it as a sales enquiry channel. The generated brief is downloaded only and is never submitted.
+The HYROX, triathlon and trail articles live in `sport-guides.mjs`; expanded public introductions live in `public-content.mjs`. They use the existing static page generator and work without JavaScript. Event rules must be checked against current official sources before editorial revisions.
+
+Vercel handles HTTP-to-HTTPS with permanent 308 redirects. The `www.enduur.co` project domain is configured to redirect to `enduur.co` with status 308 (changed from 307 on October 20, 2026). The host redirect in `vercel.json` also encodes the canonical host. Domain redirects run before project routing: preserve the permanent status in Vercel domain settings when making hosting changes. Verify both root and nested paths with query strings after changes.
 
 ## Race packages
 

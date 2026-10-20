@@ -9,7 +9,7 @@ Canonical website: https://enduur.co/
 - [Home](https://enduur.co/): how race sponsorship works, visible FAQs and the race value calculator at /#pricing.
 - [Athletes](https://enduur.co/athletes): athlete packages, placements, deliverables and access to the athlete workspace.
 - [Sponsors](https://enduur.co/sponsors): finding race opportunities and defining brand deliverables.
-- [For sponsors](https://enduur.co/for-sponsors): brand package examples; some services are proposed rather than live.
+- [For sponsors](https://enduur.co/for-sponsors): campaign planning, quote-required scopes, rights, reporting and a device-local season brief download.
 - [Guides](https://enduur.co/guides): practical race sponsorship articles.
 - [How to get sponsored for your next race](https://enduur.co/guides/how-to-get-sponsored-for-your-next-race): per-race packages for age-groupers, calculator examples, pitch template and delivery planning.
 - [Race-day temporary tattoo sponsorship](https://enduur.co/guides/race-day-temporary-tattoo-sponsorship): road, triathlon, trail and HYROX rule checks, dimensions and illustrative pricing.
@@ -17,6 +17,10 @@ Canonical website: https://enduur.co/
 - [Sitemap](https://enduur.co/sitemap.xml): canonical public URLs.
 
 - [Cost to sponsor an endurance athlete](https://enduur.co/guides/cost-to-sponsor-endurance-athlete): brand-side quote guidance, example per-race and season scopes, and a pricing FAQ. No verified completed-deal price averages are published.
+
+- [HYROX sponsorship](https://enduur.co/guides/how-to-get-sponsored-for-hyrox): gym-community pitches, division-specific permission checks and race packages.
+- [Triathlon sponsorship](https://enduur.co/guides/how-to-get-sponsored-for-triathlon): age-group pitches, uniform restrictions and swim-bike-run visibility.
+- [Trail sponsorship](https://enduur.co/guides/how-to-get-sponsored-for-trail-running): trail and ultra packages, equipment coverage, weather and proof.
 
 ## Interpretation
 

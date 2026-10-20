@@ -68,7 +68,7 @@ test('guide metadata, calculator examples and internal discovery links are prese
     assert.equal(schema['@type'],'Article');
     assert.equal(schema.mainEntityOfPage,siteUrl+path);
     assert.equal(schema.headline,strip(html.match(/<h1>(.*?)<\/h1>/)[1]));
-    if(path!==guidePaths.costs)assert.ok(html.includes('$150–$350'));
+    if([guidePaths.sponsorship,guidePaths.tattoos].includes(path))assert.ok(html.includes('$150–$350'));
     assert.ok(html.includes('https://'), 'Source links must be present');
   }
 });

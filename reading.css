@@ -48,6 +48,7 @@
 .public-hero{display:grid;grid-template-columns:1.2fr 1fr;align-items:center;gap:64px}
 .public-hero img{width:100%;max-height:590px;object-fit:cover;border-radius:4px}
 .public-actions{display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin:28px 0}
+.public-section>p{max-width:72ch}
 .public-section{margin-top:72px;padding-top:12px;border-top:1px solid #ccd1c4}
 .public-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:36px}
 .public-split{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:baseline}
@@ -57,6 +58,13 @@
 .guide-list h2{margin-top:12px}
 .reading-main .button{white-space:normal;text-align:center;line-height:1.5}
 :focus-visible{outline:3px solid #668137;outline-offset:5px}
-@media(max-width:768px){.reading-nav{align-items:flex-start;flex-direction:column;padding:20px 24px;gap:20px}.reading-nav nav{gap:12px 20px}.reading-main{padding:24px 24px 48px}.public-hero{grid-template-columns:1fr;gap:32px}.public-hero img{max-height:420px;object-position:center 35%}.public-columns,.public-split{grid-template-columns:1fr;gap:8px}.reading-cta{padding:24px}.public-section{margin-top:48px}}
+@media(max-width:768px){.reading-nav{align-items:flex-start;flex-direction:column;padding:20px 24px;gap:20px}.reading-nav nav{gap:12px 20px}.reading-main{padding:24px 24px 48px}.public-hero{grid-template-columns:1fr;gap:32px}.public-hero img{max-height:420px;object-position:center 35%}.public-columns,.public-split{grid-template-columns:1fr;gap:8px}.reading-cta{padding:24px}.public-section>p{max-width:72ch}
+.public-section{margin-top:48px}}
 @media(max-width:390px){.reading-main,.reading-nav{padding-inline:18px}.reading-nav nav a{font-size:13px}.reading-main h1{font-size:38px}.reading-cta{padding:20px}.table-scroll th,.table-scroll td{padding:12px 8px;font-size:14px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reading-main .button{transition:none}}
+.brief-form{max-width:760px;margin:28px 0;padding:28px;background:#e8eddb}
+.brief-form label{display:grid;gap:8px;margin-bottom:20px;font-size:15px;font-weight:600}
+.brief-form input,.brief-form select,.brief-form textarea{width:100%;min-width:0;padding:12px;border:1px solid #7b8876;border-radius:4px;background:#fafbf5;color:#283e34;font:inherit}
+.brief-form textarea{resize:vertical}.brief-pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.brief-form #season-status{margin-top:16px;font-size:14px}
+@media(max-width:768px){.brief-form{padding:20px}.brief-pair{grid-template-columns:1fr;gap:0}}
