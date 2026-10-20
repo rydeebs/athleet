@@ -1,3 +1,4 @@
+import {withBrandIdentity} from './brand.mjs';
 import {publicPages,publicRoutes} from './public-pages.mjs';
 import {build} from 'esbuild';
 import {mkdir,readFile,writeFile,copyFile,rm,cp,readdir} from 'node:fs/promises';
@@ -6,7 +7,7 @@ await rm('dist/public',{recursive:true,force:true});
 await mkdir('dist/public',{recursive:true});
 await build({entryPoints:['portal/main.mjs'],outdir:'dist/public',entryNames:'portal',chunkNames:'chunks/[name]-[hash]',splitting:true,bundle:true,format:'esm',target:'es2022',minify:true});
 const assets={};
-for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css','sponsor.html','sponsor.css','sponsor.js','payment-terms.html','invite-athletes.html','invite-brands.html','invite.css','invite.js','invite.mjs','reading.css','portal-entry.mjs','robots.txt','sitemap.xml','llms.txt']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.txt')?'text/plain; charset=utf-8':path.endsWith('.xml')?'application/xml; charset=utf-8':'text/javascript; charset=utf-8'};}
+for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css','sponsor.html','sponsor.css','sponsor.js','payment-terms.html','invite-athletes.html','invite-brands.html','invite.css','invite.js','invite.mjs','reading.css','portal-entry.mjs','robots.txt','sitemap.xml','llms.txt']){const source=await readFile(path,'utf8');const body=path.endsWith('.html')?withBrandIdentity(source):source;await writeFile('dist/public/'+path,body);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.txt')?'text/plain; charset=utf-8':path.endsWith('.xml')?'application/xml; charset=utf-8':'text/javascript; charset=utf-8'};}
 for(const [path,body] of Object.entries(publicPages())){await writeFile('dist/public'+path,body);assets[path]={body,type:'text/html; charset=utf-8'};}
 assets['/portal.js']={body:await readFile('dist/public/portal.js','utf8'),type:'text/javascript; charset=utf-8'};
 for(const file of await readdir('dist/public/chunks'))assets['/chunks/'+file]={body:await readFile('dist/public/chunks/'+file,'utf8'),type:'text/javascript; charset=utf-8'};

@@ -82,6 +82,10 @@
     {
       "source": "/guides/race-day-temporary-tattoo-sponsorship",
       "destination": "/tattoo-sponsorship-guide.html"
+    },
+    {
+      "source": "/guides/cost-to-sponsor-endurance-athlete",
+      "destination": "/sponsorship-costs.html"
     }
   ],
   "crons": [

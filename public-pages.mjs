@@ -1,50 +1,55 @@
+import {brand,organizationId,withBrandIdentity} from './brand.mjs';
+import {costGuide,costGuideBody,costFaq} from './sponsorship-costs.mjs';
 import {estimateAudience} from './audience.mjs';
 
 export const siteUrl = 'https://enduur.co';
 export const guidePaths = {
   sponsorship: '/guides/how-to-get-sponsored-for-your-next-race',
   tattoos: '/guides/race-day-temporary-tattoo-sponsorship',
+  costs: costGuide.path,
 };
 const escape = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const json = value => JSON.stringify(value).replace(/</g, '\\u003c');
 const nav = `<header class="reading-nav"><a href="/" class="wordmark" aria-label="enduur home">enduur<span>™</span></a><nav aria-label="Main navigation"><a href="/athletes">Athletes</a><a href="/sponsors">Sponsors</a><a href="/guides">Guides</a><a href="/#pricing">Race value calculator</a></nav></header>`;
 const footer = `<footer class="reading-footer"><a href="/" class="wordmark">enduur<span>™</span></a><nav aria-label="Footer"><a href="/athletes">For athletes</a><a href="/for-sponsors">For brands</a><a href="/guides">Sponsorship guides</a><a href="/payment-terms.html">Payment terms</a></nav><p>Independent platform. Not affiliated with race organizers.</p></footer>`;
 const calculatorCta = `<aside class="reading-cta"><h2>Put a starting price on your next race.</h2><p>Use your public social audience to estimate a single-race package, then agree the placement, posts and proof with your sponsor.</p><a class="button dark" href="/#pricing">Calculate my race value ↗</a><a href="/athletes">Explore the athlete workspace</a></aside>`;
-const related = `<nav class="related-guides" aria-label="Related guides"><h2>Keep planning your race</h2><a href="${guidePaths.sponsorship}">How to get sponsored for your next race</a><a href="${guidePaths.tattoos}">Temporary tattoo sponsorship: rules, sizes and pricing</a></nav>`;
+const sponsorCta = `<aside class="reading-cta"><h2>Build a brief an athlete can quote.</h2><p>Choose a race, define the deliverables and agree the complete package with your athlete.</p><a class="button dark" href="/sponsors?workspace=1">Explore the sponsor workspace ↗</a><a href="/#pricing">Explore the race value calculator</a></aside>`;
+const related = `<nav class="related-guides" aria-label="Related guides"><h2>Keep planning your race</h2><a href="${guidePaths.sponsorship}">How to get sponsored for your next race</a><a href="${guidePaths.tattoos}">Temporary tattoo sponsorship: rules, sizes and pricing</a><a href="${guidePaths.costs}">${costGuide.title}</a></nav>`;
 const priceRows = [0,1000,5000,10000,25000].map(followers => {
   const {low,high} = estimateAudience([{followers}]);
   return `<tr><th scope="row">${followers.toLocaleString('en-US')}</th><td>$${low.toLocaleString('en-US')}–$${high.toLocaleString('en-US')}</td></tr>`;
 }).join('');
 const pricing = `<div class="table-scroll" tabindex="0" role="region" aria-label="Illustrative single-race prices"><table><caption>Illustrative single-race package estimates, USD</caption><thead><tr><th scope="col">Combined followers</th><th scope="col">Calculator range</th></tr></thead><tbody>${priceRows}</tbody></table></div><p class="reading-note">Planning estimates, not observed market rates, guaranteed earnings or binding offers. The package is one placement, one social post and event photo proof. Printing, shipping, additional content, usage rights, platform fees and taxes are not itemized by this calculator; agree the final scope and total separately.</p>`;
 
-function page({path,title,description,body,article=false,portal=false}) {
+function page({path,title,description,body,article=false,portal=false,faq=[]}) {
   const schema = article ? {
     '@context':'https://schema.org','@type':'Article',
     headline:title,description,datePublished:'2026-10-20',dateModified:'2026-10-20',
-    author:{'@type':'Organization',name:'enduur',url:siteUrl},
-    publisher:{'@type':'Organization',name:'enduur',url:siteUrl},
+    author:{'@type':'Organization','@id':organizationId,name:brand.name},
+    publisher:{'@type':'Organization','@id':organizationId,name:brand.name},
     mainEntityOfPage:siteUrl+path,inLanguage:'en',
   } : {'@context':'https://schema.org','@type':'WebPage',name:title,description,url:siteUrl+path};
-  return `<!doctype html>
+  return withBrandIdentity(`<!doctype html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(title)} | enduur</title><meta name="description" content="${escape(description)}"><link rel="canonical" href="${siteUrl+path}">
 <meta property="og:type" content="${article?'article':'website'}"><meta property="og:title" content="${escape(title)}"><meta property="og:description" content="${escape(description)}"><meta property="og:url" content="${siteUrl+path}"><meta property="og:site_name" content="enduur"><meta property="og:image" content="${siteUrl}/assets/social/enduur-logo.jpeg"><meta name="twitter:card" content="summary_large_image">
 <meta name="referrer" content="strict-origin-when-cross-origin"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23283e34'/%3E%3Ctext x='7' y='24' font-family='sans-serif' font-size='28' font-weight='bold' fill='%23d6ed78'%3Ee%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/reading.css">
-<script type="application/ld+json">${json(schema)}</script></head><body>
+<script type="application/ld+json">${json(schema)}</script>${faq.length?`<script type="application/ld+json">${json({'@context':'https://schema.org','@type':'FAQPage',mainEntity:faq.map(([name,text])=>({'@type':'Question',name,acceptedAnswer:{'@type':'Answer',text}}))})}</script>`:''}</head><body>
 <div id="public-page"><a class="skip-link" href="#content">Skip to content</a>${nav}<main id="content" class="reading-main">${body}</main>${footer}</div>
 ${portal?'<div id="portal" hidden></div><div id="toast" role="status" aria-live="polite"></div><dialog id="modal" aria-labelledby="modal-title"></dialog><script type="module" src="/portal-entry.mjs"></script>':''}
-</body></html>`;
+</body></html>`);
 }
-function article(path,title,description,body) {
-  return page({path,title,description,article:true,body:`<article class="reading-article"><header><a href="/guides">Sponsorship guides</a><h1>${title}</h1><p class="reading-deck">${description}</p><p class="reading-meta">By enduur · Published October 20, 2026</p></header>${body}${calculatorCta}${related}</article>`});
+function article(path,title,description,body,{sponsor=false,faq=[]}={}) {
+  return page({path,title,description,article:true,faq,body:`<article class="reading-article"><header><a href="/guides">Sponsorship guides</a><h1>${title}</h1><p class="reading-deck">${description}</p><p class="reading-meta">By enduur · Published October 20, 2026</p></header>${body}${sponsor?sponsorCta:calculatorCta}${related}</article>`});
 }
 
 export function publicPages() {
   const sponsorshipTitle='How to get sponsored for your next race (even as an age-grouper).';
   const tattooTitle='Race-day temporary tattoo sponsorship: rules, sizes and pricing';
   return {
+    '/sponsorship-costs.html': article(costGuide.path,costGuide.title,costGuide.description,costGuideBody,{sponsor:true,faq:costFaq}),
     '/athletes.html': page({path:'/athletes',title:'Race sponsorship for everyday athletes',description:'Build a race sponsorship package with enduur. Estimate your race value, choose body or kit placements, and agree posts and photo proof with a brand.',portal:true,body:`
 <section class="public-hero"><div><p class="reading-kicker">FOR ATHLETES</p><h1>Your next race.<br><em>A brand beside you.</em></h1><p class="reading-deck">Race sponsorship for age-groupers and everyday endurance athletes. Turn one event into a clear offer: an approved body or kit placement, agreed social content, and photo proof.</p><div class="public-actions"><a class="button dark" href="/athletes?workspace=1">Open athlete workspace ↗</a><a href="/#pricing">Calculate my race value</a></div><p class="reading-note">Road. Trail. Triathlon. HYROX. Choose a partnership that fits your race and its rules.</p></div><img src="/assets/athletes/v2/athlete-welcome.webp" alt="Athletes training on treadmills beside a mountain view" width="1200" height="1800" fetchpriority="high"></section>
 <section class="public-section"><h2>Build a package around one start line.</h2><div class="public-columns"><div><h3>1. Name your race</h3><p>Add the date, location, discipline and distance. Describe your audience and the community a sponsor would reach.</p></div><div><h3>2. Define the offer</h3><p>Choose permitted placements, set your asking price and agree the content. Confirm organizer restrictions before promising a logo on skin or kit.</p></div><div><h3>3. Deliver the proof</h3><p>Share the agreed posts and event photos. Use the completed package as evidence when you approach your next sponsor.</p></div></div></section>
@@ -57,7 +62,7 @@ ${calculatorCta}${related}<p class="reading-note">Want to explore first? <a href
 ${related}<p class="reading-note"><a href="/sponsors?demo=1">Try the sponsor demo</a> with fictional listings. No real sponsorships or payments take place in the demo. The interactive workspace requires JavaScript.</p>`}),
     '/guides.html': page({path:'/guides',title:'Race sponsorship guides',description:'Practical guides to per-race sponsorship for age-groupers, including temporary tattoo rules, artwork sizes, pricing and race value estimates.',body:`
 <header class="guide-index"><p class="reading-kicker">THE NEXT START LINE</p><h1>Make a better<br><em>race-day offer.</em></h1><p class="reading-deck">Practical guides for athletes and brands planning their first partnership.</p></header>
-<div class="guide-list"><article><p>FOR ATHLETES · 8 MIN READ</p><h2><a href="${guidePaths.sponsorship}">${sponsorshipTitle}</a></h2><p>Pick one event, build a package, estimate its value and send a pitch a sponsor can evaluate.</p></article><article><p>FOR ATHLETES + BRANDS · 8 MIN READ</p><h2><a href="${guidePaths.tattoos}">${tattooTitle}</a></h2><p>Plan placements for road, triathlon, trail and HYROX with sport-specific checks and clearly labeled price examples.</p></article></div>${calculatorCta}`}),
+<div class="guide-list"><article><p>FOR ATHLETES · 8 MIN READ</p><h2><a href="${guidePaths.sponsorship}">${sponsorshipTitle}</a></h2><p>Pick one event, build a package, estimate its value and send a pitch a sponsor can evaluate.</p></article><article><p>FOR ATHLETES + BRANDS · 8 MIN READ</p><h2><a href="${guidePaths.tattoos}">${tattooTitle}</a></h2><p>Plan placements for road, triathlon, trail and HYROX with sport-specific checks and clearly labeled price examples.</p></article><article><p>FOR BRANDS · 7 MIN READ</p><h2><a href="${guidePaths.costs}">${costGuide.title}</a></h2><p>Compare per-race and season package scopes, understand what changes a quote, and budget using real athlete proposals.</p></article></div>${calculatorCta}`}),
     '/race-sponsorship-guide.html': article(guidePaths.sponsorship,sponsorshipTitle,'A practical guide to selling one race-day package: choose your event, define the deliverables, use the race value calculator and pitch a sponsor who fits.',`
 <p>You can approach a sponsor without a pro contract or a podium prediction. Start with something a brand can evaluate: a named race, a relevant audience and a small set of deliverables you can actually complete. Your first goal is one well-scoped partnership.</p>
 <nav class="reading-toc" aria-label="On this page"><strong>In this guide</strong><a href="#pick-a-race">Pick one race</a><a href="#package">Build the package</a><a href="#price">Set a starting price</a><a href="#pitch">Send the pitch</a><a href="#delivery">Deliver and renew</a></nav>
@@ -147,6 +152,7 @@ export const publicRoutes = {
   '/athletes':'/athletes.html',
   '/sponsors':'/sponsors.html',
   '/guides':'/guides.html',
+  [guidePaths.costs]:'/sponsorship-costs.html',
   [guidePaths.sponsorship]:'/race-sponsorship-guide.html',
   [guidePaths.tattoos]:'/tattoo-sponsorship-guide.html',
 };

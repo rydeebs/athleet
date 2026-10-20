@@ -1,6 +1,6 @@
-# enduur
+# enduur race-day sponsorships
 
-> enduur is an endurance athlete sponsorship platform for per-race partnerships across road running, trail and ultramarathons, triathlon and HYROX.
+> enduur race-day sponsorships connects endurance athletes and brands for per-race and season partnerships across road running, triathlon, trail and HYROX.
 
 Canonical website: https://enduur.co/
 
@@ -15,6 +15,8 @@ Canonical website: https://enduur.co/
 - [Race-day temporary tattoo sponsorship](https://enduur.co/guides/race-day-temporary-tattoo-sponsorship): road, triathlon, trail and HYROX rule checks, dimensions and illustrative pricing.
 - [Payment terms](https://enduur.co/payment-terms.html): payment conditions and responsibilities.
 - [Sitemap](https://enduur.co/sitemap.xml): canonical public URLs.
+
+- [Cost to sponsor an endurance athlete](https://enduur.co/guides/cost-to-sponsor-endurance-athlete): brand-side quote guidance, example per-race and season scopes, and a pricing FAQ. No verified completed-deal price averages are published.
 
 ## Interpretation
 
