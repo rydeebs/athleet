@@ -49,11 +49,11 @@
   "rewrites": [
     {
       "source": "/athletes",
-      "destination": "/portal.html"
+      "destination": "/athletes.html"
     },
     {
       "source": "/sponsors",
-      "destination": "/portal.html"
+      "destination": "/sponsors.html"
     },
     {
       "source": "/for-sponsors",
@@ -70,6 +70,18 @@
     {
       "source": "/invite/brands",
       "destination": "/invite-brands.html"
+    },
+    {
+      "source": "/guides",
+      "destination": "/guides.html"
+    },
+    {
+      "source": "/guides/how-to-get-sponsored-for-your-next-race",
+      "destination": "/race-sponsorship-guide.html"
+    },
+    {
+      "source": "/guides/race-day-temporary-tattoo-sponsorship",
+      "destination": "/tattoo-sponsorship-guide.html"
     }
   ],
   "crons": [
@@ -77,5 +89,6 @@
       "path": "/api/payments-cron",
       "schedule": "*/15 * * * *"
     }
-  ]
+  ],
+  "trailingSlash": false
 }

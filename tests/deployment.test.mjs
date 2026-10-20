@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { createAudienceHandler } from '../server/audience-handler.mjs';
+import {publicPages} from '../public-pages.mjs';
 import vercelAudience from '../api/audience.js';
 
 const payload = { accounts: [{ platform: 'x', handle: '@runner' }] };
@@ -93,8 +94,8 @@ test('Vercel serves only public assets and includes the audience function', asyn
   assert.equal(config.framework, null);
   assert.equal(config.outputDirectory, 'dist/public');
   assert.equal(config.functions['api/audience.js'].maxDuration, 30);
-  assert.deepEqual((await readdir(config.outputDirectory)).sort(), ['app.js', 'assets', 'audience.mjs', 'chunks', 'index.html', 'invite-athletes.html', 'invite-brands.html', 'invite.css', 'invite.js', 'invite.mjs', 'payment-terms.html', 'portal.css', 'portal.html', 'portal.js', 'races.mjs', 'sponsor.css', 'sponsor.html', 'sponsor.js', 'style.css']);
-  for (const file of (await readdir(config.outputDirectory)).filter(file => !['portal.js','assets','chunks'].includes(file))) {
+  assert.deepEqual((await readdir(config.outputDirectory)).sort(), ['app.js', 'assets', 'audience.mjs', 'chunks', 'index.html', 'invite-athletes.html', 'invite-brands.html', 'invite.css', 'invite.js', 'invite.mjs', 'payment-terms.html', 'portal.css', 'portal.html', 'portal.js', 'races.mjs', 'sponsor.css', 'sponsor.html', 'sponsor.js', 'style.css', 'reading.css', 'portal-entry.mjs', 'robots.txt', 'sitemap.xml', 'llms.txt', ...Object.keys(publicPages()).map(path=>path.slice(1))].sort());
+  for (const file of (await readdir(config.outputDirectory)).filter(file => !['portal.js','assets','chunks',...Object.keys(publicPages()).map(path=>path.slice(1))].includes(file))) {
     assert.equal(await readFile(`${config.outputDirectory}/${file}`, 'utf8'), await readFile(file, 'utf8'));
   }
   assert.ok((await readFile('dist/public/index.html', 'utf8')).includes('Monetize your audience'));

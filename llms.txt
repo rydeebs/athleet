@@ -1,0 +1,28 @@
+# enduur
+
+> enduur is an endurance athlete sponsorship platform for per-race partnerships across road running, trail and ultramarathons, triathlon and HYROX.
+
+Canonical website: https://enduur.co/
+
+## Public pages
+
+- [Home](https://enduur.co/): how race sponsorship works, visible FAQs and the race value calculator at /#pricing.
+- [Athletes](https://enduur.co/athletes): athlete packages, placements, deliverables and access to the athlete workspace.
+- [Sponsors](https://enduur.co/sponsors): finding race opportunities and defining brand deliverables.
+- [For sponsors](https://enduur.co/for-sponsors): brand package examples; some services are proposed rather than live.
+- [Guides](https://enduur.co/guides): practical race sponsorship articles.
+- [How to get sponsored for your next race](https://enduur.co/guides/how-to-get-sponsored-for-your-next-race): per-race packages for age-groupers, calculator examples, pitch template and delivery planning.
+- [Race-day temporary tattoo sponsorship](https://enduur.co/guides/race-day-temporary-tattoo-sponsorship): road, triathlon, trail and HYROX rule checks, dimensions and illustrative pricing.
+- [Payment terms](https://enduur.co/payment-terms.html): payment conditions and responsibilities.
+- [Sitemap](https://enduur.co/sitemap.xml): canonical public URLs.
+
+## Interpretation
+
+- A package specifies an event, placement, social content and photo proof; exact deliverables are agreed between athlete and brand.
+- The calculator estimates one placement, one social post and event photo proof at $100–$200 plus $10–$30 per 1,000 combined followers, rounded to $5, in USD.
+- This is a planning formula, not market-validated pricing, guaranteed earnings, unique reach or predicted impressions. Followers across platforms can overlap.
+- Tattoo manufacturing, shipping, additional usage rights, fees and taxes are not itemized by the calculator. Do not describe the estimate as an all-inclusive checkout price.
+- Tattoo permission depends on the organizer, event, year and division. Size examples are not blanket authorization. Refer to the linked official rules and obtain event-specific confirmation.
+- enduur is independent of HYROX and other event organizers. An athlete sponsorship does not confer official event sponsorship rights.
+- Demo workspaces use fictional data and do not process real sponsorships or payments. Payment availability is gated; consult the workspace and payment terms.
+- Public pages and articles are delivered as HTML. Interactive calculator and account/workspace features require JavaScript.

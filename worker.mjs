@@ -1,3 +1,4 @@
+import {publicRoutes} from './public-pages.mjs';
 import {assets} from './assets.mjs';
 import {createAudienceHandler} from './server/audience-handler.mjs';
 import {portalConfig} from './server/portal-config.mjs';
@@ -9,8 +10,8 @@ export default {async fetch(request,env={}){
   return handleAudience(request);
  }
  if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method not allowed',{status:405});
- if((url.pathname.startsWith('/assets/athletes/')||url.pathname.startsWith('/assets/vision/'))&&env.ASSETS)return env.ASSETS.fetch(request);
+ if((url.pathname.startsWith('/assets/athletes/')||url.pathname.startsWith('/assets/vision/')||url.pathname.startsWith('/assets/social/'))&&env.ASSETS)return env.ASSETS.fetch(request);
  const inviteRoute={'/invite':'/invite-athletes.html','/invite/athletes':'/invite-athletes.html','/invite/brands':'/invite-brands.html'}[url.pathname.replace(/\/$/,'')];
- const path=inviteRoute||(/^\/for-sponsors\/?$/.test(url.pathname)?'/sponsor.html':url.pathname==='/'?'/index.html':/^\/(athletes|sponsors)\/?$/.test(url.pathname)?'/portal.html':url.pathname);const asset=assets[path];if(!asset)return new Response('Not found',{status:404,headers:{'Content-Type':'text/plain'}});
+ const path=publicRoutes[url.pathname.replace(/\/$/,'')]||inviteRoute||(/^\/for-sponsors\/?$/.test(url.pathname)?'/sponsor.html':url.pathname==='/'?'/index.html':url.pathname);const asset=assets[path];if(!asset)return new Response('Not found',{status:404,headers:{'Content-Type':'text/plain'}});
  return new Response(request.method==='HEAD'?null:asset.body,{headers:{'Content-Type':asset.type,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}});
 }};

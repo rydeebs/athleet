@@ -1,3 +1,4 @@
+import {publicPages,publicRoutes} from './public-pages.mjs';
 import {build} from 'esbuild';
 import {mkdir,readFile,writeFile,copyFile,rm,cp,readdir} from 'node:fs/promises';
 await mkdir('dist/server',{recursive:true});
@@ -5,19 +6,21 @@ await rm('dist/public',{recursive:true,force:true});
 await mkdir('dist/public',{recursive:true});
 await build({entryPoints:['portal/main.mjs'],outdir:'dist/public',entryNames:'portal',chunkNames:'chunks/[name]-[hash]',splitting:true,bundle:true,format:'esm',target:'es2022',minify:true});
 const assets={};
-for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css','sponsor.html','sponsor.css','sponsor.js','payment-terms.html','invite-athletes.html','invite-brands.html','invite.css','invite.js','invite.mjs']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8'};}
+for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs','portal.html','portal.css','sponsor.html','sponsor.css','sponsor.js','payment-terms.html','invite-athletes.html','invite-brands.html','invite.css','invite.js','invite.mjs','reading.css','portal-entry.mjs','robots.txt','sitemap.xml','llms.txt']){const body=await readFile(path,'utf8');await copyFile(path,'dist/public/'+path);assets['/'+path]={body,type:path.endsWith('.html')?'text/html; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':path.endsWith('.txt')?'text/plain; charset=utf-8':path.endsWith('.xml')?'application/xml; charset=utf-8':'text/javascript; charset=utf-8'};}
+for(const [path,body] of Object.entries(publicPages())){await writeFile('dist/public'+path,body);assets[path]={body,type:'text/html; charset=utf-8'};}
 assets['/portal.js']={body:await readFile('dist/public/portal.js','utf8'),type:'text/javascript; charset=utf-8'};
 for(const file of await readdir('dist/public/chunks'))assets['/chunks/'+file]={body:await readFile('dist/public/chunks/'+file,'utf8'),type:'text/javascript; charset=utf-8'};
 await cp('assets/vision','dist/public/assets/vision',{recursive:true});
 await cp('node_modules/@mediapipe/tasks-vision/wasm','dist/public/assets/vision/v1/wasm',{recursive:true});
 await cp('assets/athletes','dist/public/assets/athletes',{recursive:true});
+await cp('assets/social','dist/public/assets/social',{recursive:true});
 await writeFile('dist/server/assets.mjs','export const assets='+JSON.stringify(assets)+';\n');
 const portalConfigSource=await readFile('server/portal-config.mjs','utf8');
 const audience=await readFile('audience.mjs','utf8');
 const social=(await readFile('social.mjs','utf8')).replace(/^import .*?;\n/,'');
 const worker=(await readFile('worker.mjs','utf8')).replace(/^import .*?;\n/gm,'');
 const handler=(await readFile('server/audience-handler.mjs','utf8')).replace(/^import .*?;\n/gm,'');
-await writeFile('dist/server/index.js','const assets='+JSON.stringify(assets)+';\n'+audience+'\n'+social+'\n'+handler+'\n'+portalConfigSource+'\n'+worker);
+await writeFile('dist/server/index.js','const publicRoutes='+JSON.stringify(publicRoutes)+';\nconst assets='+JSON.stringify(assets)+';\n'+audience+'\n'+social+'\n'+handler+'\n'+portalConfigSource+'\n'+worker);
 for(const path of ['assets.mjs','social.mjs','audience.mjs'])await rm('dist/server/'+path,{force:true});
 for(const path of ['index.html','style.css','app.js','audience.mjs','races.mjs'])await rm('dist/'+path,{force:true});
 console.log('Built Vercel static output in dist/public and Sites Worker in dist/server.');
